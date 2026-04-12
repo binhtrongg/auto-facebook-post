@@ -239,6 +239,8 @@ function _routeApi(action, params, body) {
     case "increment_apify_usage":    _incrementApifyUsage(SS, body.api_key, parseInt(body.count) || 1); return _json({ ok: true });
     case "update_source_scraped_at": _updateSourceScrapedAt(SS, body.page_url, body.scraped_at); return _json({ ok: true });
     case "save_log":                 _saveLog(SS, body.fb_post_id, body.destination_page_id, body.result, body.error_message || ""); return _json({ ok: true });
+    case "clear_dedup":              _clearSheet(SS, "dedup"); return _json({ ok: true });
+    case "clear_schedule":           _clearSheet(SS, "schedule"); return _json({ ok: true });
     default:                         return _err("Unknown action: " + action);
   }
 }
@@ -331,6 +333,12 @@ function _resetMonthlyUsageIfNeeded(SS) {
       sh.getRange(i + 1, rc + 1).setValue(nm);
     }
   }
+}
+
+function _clearSheet(SS, tabName) {
+  var sh = SS.getSheetByName(tabName);
+  if (!sh || sh.getLastRow() <= 1) return;
+  sh.deleteRows(2, sh.getLastRow() - 1);
 }
 
 function _clearOldLogs(SS) {
