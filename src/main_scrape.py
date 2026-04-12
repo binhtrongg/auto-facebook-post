@@ -148,6 +148,7 @@ def run():
                         fb_post_id          = fb_post_id,
                         destination_page_id = dest_id,
                         result              = "scheduled",
+                        source_page_url     = page.get("fb_page_url", ""),
                     )
                     scheduled_ok += 1
 
@@ -162,6 +163,7 @@ def run():
                         destination_page_id = dest_id,
                         result              = "failed",
                         error_message       = str(e),
+                        source_page_url     = page.get("fb_page_url", ""),
                     )
                     total_errors += 1
 

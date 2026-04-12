@@ -98,12 +98,14 @@ def update_dest_last_scheduled(destination_page_id: str,
 
 def save_log(scheduled_post_id: str | None, fb_post_id: str,
              destination_page_id: str, result: str,
-             error_message: str | None = None):
+             error_message: str | None = None,
+             source_page_url: str | None = None):
     _post("save_log",
           fb_post_id=fb_post_id,
           destination_page_id=destination_page_id,
           result=result,
-          error_message=error_message or "")
+          error_message=error_message or "",
+          source_page_url=source_page_url or "")
 
 
 # ── Apify Keys ─────────────────────────────────────────────

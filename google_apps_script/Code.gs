@@ -238,7 +238,7 @@ function _routeApi(action, params, body) {
     case "update_last_scheduled":    _updateLastScheduled(SS, body.dest_page_id, body.last_scheduled_at); return _json({ ok: true });
     case "increment_apify_usage":    _incrementApifyUsage(SS, body.api_key, parseInt(body.count) || 1); return _json({ ok: true });
     case "update_source_scraped_at": _updateSourceScrapedAt(SS, body.page_url, body.scraped_at); return _json({ ok: true });
-    case "save_log":                 _saveLog(SS, body.fb_post_id, body.destination_page_id, body.result, body.error_message || ""); return _json({ ok: true });
+    case "save_log":                 _saveLog(SS, body.fb_post_id, body.destination_page_id, body.result, body.error_message || "", body.source_page_url || ""); return _json({ ok: true });
     case "clear_dedup":              _clearSheet(SS, "dedup"); return _json({ ok: true });
     case "clear_schedule":           _clearSheet(SS, "schedule"); return _json({ ok: true });
     default:                         return _err("Unknown action: " + action);
@@ -317,8 +317,14 @@ function _updateSourceScrapedAt(SS, pageUrl, scrapedAt) {
   _upsertByKey(SS, "source_pages", "fb_page_url", pageUrl, "last_scraped_at", scrapedAt);
 }
 
-function _saveLog(SS, fbPostId, destPageId, result, errMsg) {
-  SS.getSheetByName("logs").appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || ""]);
+function _saveLog(SS, fbPostId, destPageId, result, errMsg, sourcePageUrl) {
+  var sh = SS.getSheetByName("logs");
+  // Đảm bảo header có cột source_page_url
+  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (header.indexOf("source_page_url") === -1) {
+    sh.getRange(1, header.length + 1).setValue("source_page_url");
+  }
+  sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || ""]);
 }
 
 function _resetMonthlyUsageIfNeeded(SS) {
