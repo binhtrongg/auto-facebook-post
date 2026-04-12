@@ -1,31 +1,15 @@
+# Workflow này không còn cần thiết.
+# Việc đăng bài được thực hiện trực tiếp trong scrape.yml
+# (upload lên Facebook dạng scheduled post ngay khi scrape)
 name: Post Scheduled Facebook Posts
 
 on:
-  schedule:
-    # Chạy mỗi 30 phút để kiểm tra bài đến giờ đăng
-    - cron: '*/30 * * * *'
-  workflow_dispatch:    # Cho phép chạy thủ công từ GitHub UI
+  workflow_dispatch:  # Chỉ chạy thủ công nếu cần, không schedule tự động
 
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 10   # Tối đa 10 phút
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run post job
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python -m src.main_post
+      - name: Thông báo
+        run: echo "Workflow này đã được thay thế bởi scrape.yml"
