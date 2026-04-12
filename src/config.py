@@ -37,7 +37,7 @@ POST_INTERVAL_MIN_MINUTES = 30  # Khoảng cách tối thiểu giữa 2 bài đ�
 POST_INTERVAL_MAX_MINUTES = 60  # Khoảng cách tối đa
 
 # ── Facebook Graph API ────────────────────────────────────
-FB_API_VERSION = "v19.0"
+FB_API_VERSION = "v21.0"
 FB_API_BASE    = f"https://graph.facebook.com/{FB_API_VERSION}"
 
 # ── Logging ───────────────────────────────────────────────

@@ -166,49 +166,51 @@ def _extract_media(media_list: list) -> tuple[list[str], str | None]:
     """
     Trích xuất image_urls và video_url từ trường media của Apify.
 
-    Cấu trúc media có thể có nhiều dạng:
-    - Photo: nodes[].media.viewer_image.uri  (độ phân giải cao nhất)
-    - Video: nodes[].media.videoUrl hoặc .dashManifestUrl
+    Apify facebook-posts-scraper trả về mỗi item trong media[] là 1 ảnh/video:
+    - Photo: item.photo_image.uri  hoặc item.thumbnail
+    - Video: item.videoUrl / item.browser_native_hd_url / item.browser_native_sd_url
     """
     image_urls: list[str] = []
     video_url:  str | None = None
     seen:       set[str]  = set()
 
-    for media_item in media_list:
-        if not isinstance(media_item, dict):
+    def _add_image(uri: str):
+        if uri and uri not in seen:
+            seen.add(uri)
+            image_urls.append(uri)
+
+    for item in media_list:
+        if not isinstance(item, dict):
             continue
 
-        # Duyệt các loại subattachment (two/three/four/five/frame)
-        for key in ("frame_sublayout_subattachments",
-                    "two_photos_subattachments",
-                    "three_photos_subattachments",
-                    "four_photos_subattachments",
-                    "five_photos_subattachments"):
-            sub = media_item.get(key, {})
-            if not isinstance(sub, dict):
-                continue
-            for node in sub.get("nodes", []):
-                m = node.get("media", {})
-                if not isinstance(m, dict):
-                    continue
+        typename = item.get("__typename", "")
 
-                typename = m.get("__typename", "")
+        # ── Video ────────────────────────────────────────────
+        if typename == "Video" or item.get("videoUrl"):
+            vurl = (item.get("videoUrl") or
+                    item.get("browser_native_hd_url") or
+                    item.get("browser_native_sd_url") or
+                    item.get("dashManifestUrl"))
+            if vurl and not video_url:
+                video_url = vurl
+            continue
 
-                if typename == "Video" or m.get("videoUrl"):
-                    # Video
-                    vurl = (m.get("videoUrl") or
-                            m.get("dashManifestUrl") or
-                            m.get("browser_native_hd_url") or
-                            m.get("browser_native_sd_url"))
-                    if vurl and not video_url:
-                        video_url = vurl
-                else:
-                    # Photo: ưu tiên viewer_image (cao nhất), fallback image
-                    vi = m.get("viewer_image") or m.get("image") or {}
-                    uri = vi.get("uri") if isinstance(vi, dict) else None
-                    if uri and uri not in seen:
-                        seen.add(uri)
-                        image_urls.append(uri)
+        # ── Photo trực tiếp (cấu trúc phổ biến nhất) ────────
+        photo_image = item.get("photo_image")
+        if isinstance(photo_image, dict) and photo_image.get("uri"):
+            _add_image(photo_image["uri"])
+            continue
+
+        # ── viewer_image fallback ────────────────────────────
+        viewer_image = item.get("viewer_image")
+        if isinstance(viewer_image, dict) and viewer_image.get("uri"):
+            _add_image(viewer_image["uri"])
+            continue
+
+        # ── thumbnail fallback (luôn có) ─────────────────────
+        thumbnail = item.get("thumbnail")
+        if thumbnail:
+            _add_image(thumbnail)
 
     return image_urls, video_url
 
