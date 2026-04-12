@@ -1,0 +1,56 @@
+services:
+
+  # ── Admin Panel ─────────────────────────────────────────
+  admin:
+    build: .
+    container_name: autofb_admin
+    restart: unless-stopped
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    ports:
+      - "8501:8501"          # Dùng khi test local (không có Nginx)
+    networks:
+      - autofb_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Nginx Reverse Proxy ─────────────────────────────────
+  # Dùng khi có domain thật (bỏ comment block này)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: autofb_nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #     - ./nginx/ssl:/etc/nginx/ssl:ro          # cert + key ở đây
+  #     - certbot_www:/var/www/certbot:ro
+  #   depends_on:
+  #     - admin
+  #   networks:
+  #     - autofb_net
+
+  # ── Certbot SSL (Let's Encrypt) ─────────────────────────
+  # Chạy 1 lần để lấy SSL cert:
+  #   docker compose run --rm certbot
+  # certbot:
+  #   image: certbot/certbot
+  #   volumes:
+  #     - ./nginx/ssl:/etc/letsencrypt
+  #     - certbot_www:/var/www/certbot
+  #   command: certonly --webroot --webroot-path=/var/www/certbot
+  #            --email your@email.com --agree-tos --no-eff-email
+  #            -d yourdomain.com
+
+networks:
+  autofb_net:
+    driver: bridge
+
+# volumes:
+#   certbot_www:

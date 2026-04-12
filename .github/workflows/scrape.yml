@@ -1,0 +1,33 @@
+name: Scrape & Schedule Facebook Posts
+
+on:
+  schedule:
+    # Chạy mỗi 8 tiếng: 01:00, 09:00, 17:00 UTC (08:00, 16:00, 00:00 GMT+7)
+    - cron: '0 1,9,17 * * *'
+  workflow_dispatch:    # Cho phép chạy thủ công từ GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scrape job
+        env:
+          DB_BACKEND: sheets
+          GOOGLE_WEBAPP_URL: ${{ secrets.GOOGLE_WEBAPP_URL }}
+          WEBAPP_SECRET: ${{ secrets.WEBAPP_SECRET }}
+          LOG_LEVEL: INFO
+        run: python -m src.main_scrape
