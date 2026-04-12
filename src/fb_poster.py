@@ -132,6 +132,7 @@ class FacebookPoster:
     def _upload_unpublished_photo(self, image_url: str) -> str:
         """Upload ảnh chưa publish, trả về photo_id."""
         url  = f"{self.base}/{self.page_id}/photos"
+        logger.info(f"Upload ảnh (URL): {image_url[:80]}...")
         resp = httpx.post(url, data={
             "url":          image_url,
             "published":    "false",
@@ -139,15 +140,20 @@ class FacebookPoster:
         }, timeout=60)
 
         if resp.status_code != 200:
+            logger.warning(f"URL upload thất bại ({resp.status_code}), thử download binary...")
             image_data = _download_bytes(image_url, MAX_IMAGE_SIZE)
+            logger.info(f"Đã download {len(image_data)/1024:.0f}KB, upload binary...")
             resp = httpx.post(url, data={
                 "published":    "false",
                 "access_token": self.access_token,
             }, files={"source": ("image.jpg", image_data, "image/jpeg")},
             timeout=60)
+            logger.info(f"Binary upload status: {resp.status_code}")
 
         resp.raise_for_status()
-        return resp.json()["id"]
+        photo_id = resp.json()["id"]
+        logger.info(f"Upload ảnh thành công, photo_id={photo_id}")
+        return photo_id
 
     def _post_feed_with_photos(self, photo_ids: list[str], content: str,
                                 scheduled_ts: int | None = None) -> str:

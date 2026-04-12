@@ -102,6 +102,8 @@ def run():
             continue
 
         logger.info(f"  → Tìm thấy {len(new_posts)} bài mới, đang hẹn giờ...")
+        for i, (p, _) in enumerate(new_posts):
+            logger.info(f"    Bài {i+1}: id={p['fb_post_id'][:20]} | imgs={len(p.get('image_urls') or [])} | video={'có' if p.get('video_url') else 'không'}")
 
         # Lấy danh sách trang đích
         destinations = get_destination_pages_by_group(group_id)
