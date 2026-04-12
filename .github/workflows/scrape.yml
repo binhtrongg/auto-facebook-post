@@ -5,6 +5,13 @@ on:
     # Chạy mỗi 8 tiếng: 01:00, 09:00, 17:00 UTC (08:00, 16:00, 00:00 GMT+7)
     - cron: '0 1,9,17 * * *'
   workflow_dispatch:    # Cho phép chạy thủ công từ GitHub UI
+    inputs:
+      clear_dedup:
+        description: 'Xóa dedup trước khi chạy (để đăng lại bài cũ)?'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
 
 jobs:
   scrape:
@@ -23,6 +30,23 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Xóa dedup (nếu được yêu cầu)
+        if: ${{ github.event.inputs.clear_dedup == 'true' }}
+        env:
+          DB_BACKEND: sheets
+          GOOGLE_WEBAPP_URL: ${{ secrets.GOOGLE_WEBAPP_URL }}
+          WEBAPP_SECRET: ${{ secrets.WEBAPP_SECRET }}
+        run: |
+          python -c "
+          import os, httpx
+          url = os.environ['GOOGLE_WEBAPP_URL']
+          secret = os.environ['WEBAPP_SECRET']
+          r = httpx.post(url, params={'token': secret}, json={'action': 'clear_dedup'}, follow_redirects=True, timeout=30)
+          print('clear_dedup:', r.status_code, r.text[:200])
+          r2 = httpx.post(url, params={'token': secret}, json={'action': 'clear_schedule'}, follow_redirects=True, timeout=30)
+          print('clear_schedule:', r2.status_code, r2.text[:200])
+          "
 
       - name: Run scrape job
         env:
