@@ -142,6 +142,12 @@ def _parse_results(raw_items: list[dict],
         # Extract image & video URLs từ trường media
         image_urls, video_url = _extract_media(item.get("media") or [])
 
+        # Fallback: video/reels có thể nằm ngoài media[] ở top-level
+        if not video_url:
+            video_url = (item.get("videoUrl") or
+                         item.get("video_url") or
+                         item.get("url") if item.get("type") == "video" else None)
+
         if not content and not image_urls and not video_url:
             continue
 
@@ -157,7 +163,9 @@ def _parse_results(raw_items: list[dict],
         by_page.setdefault(matched, []).append(post)
 
     for url, posts in by_page.items():
-        logger.info(f"  {url}: {len(posts)} bài")
+        videos = sum(1 for p in posts if p.get("video_url"))
+        imgs   = sum(1 for p in posts if p.get("image_urls"))
+        logger.info(f"  {url}: {len(posts)} bài ({imgs} có ảnh, {videos} có video)")
 
     return by_page
 
@@ -185,12 +193,18 @@ def _extract_media(media_list: list) -> tuple[list[str], str | None]:
 
         typename = item.get("__typename", "")
 
-        # ── Video ────────────────────────────────────────────
-        if typename == "Video" or item.get("videoUrl"):
+        # ── Video / Reels ─────────────────────────────────────
+        is_video = (typename in ("Video", "Reel", "UnifiedVideo") or
+                    bool(item.get("videoUrl")) or
+                    bool(item.get("browser_native_hd_url")) or
+                    bool(item.get("browser_native_sd_url")))
+        if is_video:
             vurl = (item.get("videoUrl") or
                     item.get("browser_native_hd_url") or
                     item.get("browser_native_sd_url") or
-                    item.get("dashManifestUrl"))
+                    item.get("dashManifestUrl") or
+                    item.get("hdUrl") or
+                    item.get("sdUrl"))
             if vurl and not video_url:
                 video_url = vurl
             continue
