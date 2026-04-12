@@ -146,7 +146,7 @@ def _parse_results(raw_items: list[dict],
         if not video_url:
             video_url = (item.get("videoUrl") or
                          item.get("video_url") or
-                         item.get("url") if item.get("type") == "video" else None)
+                         (item.get("url") if item.get("type") == "video" else None))
 
         if not content and not image_urls and not video_url:
             continue
