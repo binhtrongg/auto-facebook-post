@@ -6,8 +6,12 @@ Scrape bài viết từ Facebook Pages qua Apify API.
 """
 import logging
 import time
+from datetime import datetime, timedelta, timezone
+
 import httpx
-from src.config import APIFY_ACTOR_ID, MAX_POSTS_PER_PAGE
+from dateutil.parser import isoparse
+
+from src.config import APIFY_ACTOR_ID, MAX_POSTS_PER_PAGE, SCRAPE_LOOKBACK_HOURS
 from src.key_rotator import get_active_key, increment_key_usage
 
 logger = logging.getLogger(__name__)
@@ -48,7 +52,8 @@ def scrape_pages(page_urls: list[str]) -> dict[str, list[dict]]:
     raw_items = _fetch_dataset(api_key, dataset_id)
     increment_key_usage(api_key, count=len(page_urls))
 
-    return _parse_results(raw_items, page_urls)
+    since = datetime.now(timezone.utc) - timedelta(hours=SCRAPE_LOOKBACK_HOURS)
+    return _parse_results(raw_items, page_urls, since)
 
 
 def _start_actor_run(api_key: str,
@@ -115,34 +120,48 @@ def _fetch_dataset(api_key: str, dataset_id: str) -> list[dict]:
 
 
 def _parse_results(raw_items: list[dict],
-                   requested_urls: list[str]) -> dict[str, list[dict]]:
+                   requested_urls: list[str],
+                   since: datetime | None = None) -> dict[str, list[dict]]:
     """
     Parse kết quả từ facebook-posts-scraper.
     Mỗi item là 1 post (flat), không lồng nhau.
 
     Fields quan trọng:
-      postId       → fb_post_id
-      text         → content
-      time         → post_time (ISO8601)
-      facebookUrl  → page URL
-      media        → danh sách media (ảnh/video)
+      postId         → fb_post_id
+      text           → content
+      time           → post_time (ISO8601)
+      facebookUrl    → page URL
+      media          → danh sách media (ảnh/video)
+      likesCount     → lượt thích
+      commentsCount  → bình luận
+      sharesCount    → chia sẻ
     """
-    # Gom posts theo page URL
     by_page: dict[str, list[dict]] = {}
+    skipped_old = 0
 
     for item in raw_items:
         post_id = str(item.get("postId") or item.get("id") or "").strip()
         if not post_id:
             continue
 
-        page_url = (item.get("facebookUrl") or item.get("inputUrl") or "").rstrip("/")
-        content  = (item.get("text") or "").strip()
+        page_url  = (item.get("facebookUrl") or item.get("inputUrl") or "").rstrip("/")
+        content   = (item.get("text") or "").strip()
         post_time = item.get("time") or item.get("timestamp")
 
-        # Extract image & video URLs từ trường media
-        image_urls, video_url = _extract_media(item.get("media") or [])
+        # Lọc bài quá cũ
+        if since and post_time:
+            try:
+                pt = isoparse(str(post_time))
+                if pt.tzinfo is None:
+                    pt = pt.replace(tzinfo=timezone.utc)
+                if pt < since:
+                    skipped_old += 1
+                    continue
+            except Exception:
+                pass  # Nếu parse lỗi thì giữ lại bài
 
-        # Fallback: video/reels có thể nằm ngoài media[] ở top-level
+        # Extract media
+        image_urls, video_url = _extract_media(item.get("media") or [])
         if not video_url:
             video_url = (item.get("videoUrl") or
                          item.get("video_url") or
@@ -151,16 +170,29 @@ def _parse_results(raw_items: list[dict],
         if not content and not image_urls and not video_url:
             continue
 
+        # Engagement metrics
+        likes    = int(item.get("likesCount")    or item.get("likes")    or 0)
+        comments = int(item.get("commentsCount") or item.get("comments") or 0)
+        shares   = int(item.get("sharesCount")   or item.get("shares")   or 0)
+        engagement_score = likes + comments * 2 + shares * 3
+
         post = {
-            "fb_post_id":  post_id,
-            "content":     content,
-            "image_urls":  image_urls,
-            "video_url":   video_url,
-            "post_time":   str(post_time) if post_time else None,
+            "fb_post_id":       post_id,
+            "content":          content,
+            "image_urls":       image_urls,
+            "video_url":        video_url,
+            "post_time":        str(post_time) if post_time else None,
+            "likes":            likes,
+            "comments":         comments,
+            "shares":           shares,
+            "engagement_score": engagement_score,
         }
 
         matched = _match_url(page_url, requested_urls) or page_url
         by_page.setdefault(matched, []).append(post)
+
+    if skipped_old:
+        logger.info(f"  Bỏ qua {skipped_old} bài cũ hơn {SCRAPE_LOOKBACK_HOURS}h")
 
     for url, posts in by_page.items():
         videos = sum(1 for p in posts if p.get("video_url"))

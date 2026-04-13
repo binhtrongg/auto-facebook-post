@@ -184,8 +184,8 @@ function setupSpreadsheet() {
     ["Nhóm mẫu", "https://www.facebook.com/thongtinchinhphu", "Thông tin Chính phủ", "TRUE", ""]
   ]);
   _createTab(ss, "destination_pages", [
-    ["group_name", "fb_page_id", "fb_page_name", "fb_access_token", "is_active", "last_scheduled_at"],
-    ["Nhóm mẫu", "NHAP_PAGE_ID", "Tên trang của bạn", "NHAP_ACCESS_TOKEN", "TRUE", ""]
+    ["group_name", "fb_page_id", "fb_page_name", "fb_access_token", "is_active", "last_scheduled_at", "max_posts_per_run", "post_interval_hours"],
+    ["Nhóm mẫu", "NHAP_PAGE_ID", "Tên trang của bạn", "NHAP_ACCESS_TOKEN", "TRUE", "", "4", "2"]
   ]);
   _createTab(ss, "apify_keys", [
     ["api_key", "email", "usage_count", "monthly_limit", "is_active", "last_used_at", "reset_at"],
@@ -529,8 +529,8 @@ function _buildHtml(initialData) {
     + '<div id="tab-dests" class="tab">'
     + '<div class="topbar"><h1>📤 Trang đích (page của bạn)</h1>'
     + '<button class="btn p" data-add="destination_pages">＋ Thêm trang đích</button></div>'
-    + '<div class="card"><table><thead><tr><th>Nhóm</th><th>Tên trang</th><th>Page ID</th><th>Trạng thái</th><th>Hẹn giờ cuối</th><th></th></tr></thead>'
-    + '<tbody id="tb-dests"><tr><td colspan="6" class="empty">Đang tải...</td></tr></tbody></table></div>'
+    + '<div class="card"><table><thead><tr><th>Nhóm</th><th>Tên trang</th><th>Page ID</th><th>Trạng thái</th><th>Lịch đăng</th><th>Hẹn giờ cuối</th><th></th></tr></thead>'
+    + '<tbody id="tb-dests"><tr><td colspan="7" class="empty">Đang tải...</td></tr></tbody></table></div>'
     + '</div>'
 
     // FACEBOOK TOKEN GUIDE
@@ -702,10 +702,11 @@ function _buildHtml(initialData) {
     + '      + "<td><b>" + (r.fb_page_name || "") + "</b></td>"'
     + '      + "<td style=\\"font-family:monospace;font-size:12px\\">" + r.fb_page_id + "</td>"'
     + '      + "<td>" + badge(r.is_active) + "</td>"'
+    + '      + "<td style=\\"font-size:11px;color:#888\\"><b>" + (r.max_posts_per_run || 4) + "</b> bài / <b>" + (r.post_interval_hours || 2) + "</b>h</td>"'
     + '      + "<td style=\\"font-size:11px;color:#888\\">" + fmtDate(r.last_scheduled_at) + "</td>"'
     + '      + "<td>" + mkBtn("edit","destination_pages","fb_page_id",r.fb_page_id) + mkBtn("del","destination_pages","fb_page_id",r.fb_page_id) + "</td>"'
     + '      + "</tr>";'
-    + '  }).join("") : "<tr><td colspan=6 class=empty>Chưa có trang đích nào</td></tr>";'
+    + '  }).join("") : "<tr><td colspan=7 class=empty>Chưa có trang đích nào</td></tr>";'
     + '  document.getElementById("tb-dests").innerHTML = html;'
     + '}'
 
@@ -766,8 +767,10 @@ function _buildHtml(initialData) {
     + '    {k:"group_name",      l:"Thuộc nhóm", type:"groups"},'
     + '    {k:"fb_page_id",      l:"Page ID (số)", req:true, ph:"VD: 123456789", hint:"Lấy từ me/accounts trên Graph API Explorer"},'
     + '    {k:"fb_page_name",    l:"Tên trang", ph:"Tên page của bạn"},'
-    + '    {k:"fb_access_token", l:"Access Token (Long-lived)", req:true, ph:"EAAxxxxx...", hint:"Xem tab Facebook Token để biết cách lấy"},'
-    + '    {k:"is_active",       l:"Hoạt động", type:"sel", opts:["TRUE","FALSE"]}'
+    + '    {k:"fb_access_token",     l:"Access Token (Long-lived)", req:true, ph:"EAAxxxxx...", hint:"Xem tab Facebook Token để biết cách lấy"},'
+    + '    {k:"is_active",           l:"Hoạt động", type:"sel", opts:["TRUE","FALSE"]},'
+    + '    {k:"max_posts_per_run",   l:"Số bài tối đa mỗi lần chạy", ph:"4", hint:"Dù scrape được bao nhiêu, chỉ đăng tối đa số này (bài có tương tác cao nhất được ưu tiên)"},'
+    + '    {k:"post_interval_hours", l:"Khoảng cách giữa các bài (giờ)", ph:"2", hint:"VD: 1 = cách 1 giờ, 2 = cách 2 giờ, 0.5 = cách 30 phút"}'
     + '  ],'
     + '  apify_keys: ['
     + '    {k:"api_key",       l:"Apify API Key", req:true, ph:"apify_api_xxx...", hint:"Lấy tại apify.com → Settings → Integrations → API tokens"},'

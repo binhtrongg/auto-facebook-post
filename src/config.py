@@ -32,9 +32,12 @@ MAX_POSTS_PER_PAGE = 20
 APIFY_KEY_SAFE_LIMIT = 450
 
 # ── Lịch scrape / đăng ────────────────────────────────────
-SCRAPE_INTERVAL_HOURS     = 8   # Scrape 3 lần / ngày
-POST_INTERVAL_MIN_MINUTES = 30  # Khoảng cách tối thiểu giữa 2 bài đăng
-POST_INTERVAL_MAX_MINUTES = 60  # Khoảng cách tối đa
+SCRAPE_INTERVAL_HOURS        = 8    # Scrape 3 lần / ngày
+SCRAPE_LOOKBACK_HOURS        = 8    # Chỉ lấy bài trong 8 tiếng qua
+POST_INTERVAL_MIN_MINUTES    = 60   # Mặc định nếu trang đích không cài
+POST_INTERVAL_MAX_MINUTES    = 120  # (được ghi đè bởi post_interval_hours trong sheet)
+DEFAULT_MAX_POSTS_PER_RUN    = 4    # Mặc định nếu trang đích không cài
+DEFAULT_POST_INTERVAL_HOURS  = 2    # Mặc định khoảng cách giữa 2 bài (giờ)
 
 # ── Facebook Graph API ────────────────────────────────────
 FB_API_VERSION = "v21.0"

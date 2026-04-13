@@ -37,7 +37,7 @@ else:
     )
 from src.apify_scraper import scrape_pages
 from src.fb_poster import FacebookPoster
-from src.post_scheduler import build_schedule_for_group, commit_schedule
+from src.post_scheduler import build_slots_for_dest, commit_schedule, max_posts_for_dest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -98,12 +98,20 @@ def run():
             )
 
         if not new_posts:
-            logger.info("  → Không có bài mới")
+            logger.info("  → Không có bài mới trong 8 tiếng qua")
             continue
 
-        logger.info(f"  → Tìm thấy {len(new_posts)} bài mới, đang hẹn giờ...")
+        # Sắp xếp theo tương tác (cao nhất lên đầu)
+        new_posts.sort(key=lambda x: x[0].get("engagement_score", 0), reverse=True)
+
+        logger.info(f"  → {len(new_posts)} bài mới (đã sắp xếp theo tương tác):")
         for i, (p, _) in enumerate(new_posts):
-            logger.info(f"    Bài {i+1}: id={p['fb_post_id'][:20]} | imgs={len(p.get('image_urls') or [])} | video={'có' if p.get('video_url') else 'không'}")
+            logger.info(
+                f"    Bài {i+1}: id={p['fb_post_id'][:20]} | "
+                f"imgs={len(p.get('image_urls') or [])} | "
+                f"video={'có' if p.get('video_url') else 'không'} | "
+                f"❤️{p.get('likes',0)} 💬{p.get('comments',0)} 🔁{p.get('shares',0)}"
+            )
 
         # Lấy danh sách trang đích
         destinations = get_destination_pages_by_group(group_id)
@@ -111,23 +119,25 @@ def run():
             logger.warning(f"  → Group {group_name} không có trang đích nào")
             continue
 
-        # Tính lịch: mỗi trang đích nhận đủ len(new_posts) slot
-        schedule = build_schedule_for_group(group_id, len(new_posts))
-
-        # Với mỗi bài mới → hẹn giờ trên từng trang đích
+        # Với mỗi trang đích → giới hạn số bài + tính lịch riêng
         for dest in destinations:
-            dest_id      = dest["id"]
-            dest_name    = dest.get("fb_page_name", dest_id[:8])
-            slots        = schedule.get(dest_id, [])
+            dest_id   = dest["id"]
+            dest_name = dest.get("fb_page_name", dest_id[:8])
+            limit     = max_posts_for_dest(dest)
+
+            # Chỉ lấy top-N bài chưa dedup cho trang đích này
+            dest_posts = new_posts[:limit]
+            slots      = build_slots_for_dest(dest, len(dest_posts))
             scheduled_ok = 0
 
-            for idx, (post, page) in enumerate(new_posts):
-                fb_post_id = post["fb_post_id"]
-                slot       = slots[idx] if idx < len(slots) else None
+            logger.info(
+                f"  {dest_name}: lên lịch {len(dest_posts)}/{len(new_posts)} bài "
+                f"(max={limit}, interval={dest.get('post_interval_hours') or 2}h)"
+            )
 
-                if slot is None:
-                    logger.error(f"  Thiếu slot cho bài {idx}, dest {dest_name}")
-                    continue
+            for idx, (post, page) in enumerate(dest_posts):
+                fb_post_id = post["fb_post_id"]
+                slot       = slots[idx]
 
                 try:
                     poster = FacebookPoster(
@@ -141,7 +151,6 @@ def run():
                         scheduled_at = slot,
                     )
 
-                    # Lưu dedup ngay để lần scrape sau không xử lý lại
                     save_dedup(fb_post_id, page["id"], dest_id)
                     save_log(
                         scheduled_post_id   = None,
@@ -154,8 +163,7 @@ def run():
 
                 except Exception as e:
                     logger.error(
-                        f"  Lỗi hẹn giờ bài {fb_post_id[:20]}... "
-                        f"→ {dest_name}: {e}"
+                        f"  Lỗi hẹn giờ bài {fb_post_id[:20]}... → {dest_name}: {e}"
                     )
                     save_log(
                         scheduled_post_id   = None,
@@ -167,12 +175,8 @@ def run():
                     )
                     total_errors += 1
 
-            # Lưu slot cuối cùng để lần sau nối tiếp
             commit_schedule(dest_id, slots[:scheduled_ok])
-
-            logger.info(
-                f"  {dest_name}: đã hẹn giờ {scheduled_ok}/{len(new_posts)} bài"
-            )
+            logger.info(f"  {dest_name}: đã hẹn giờ {scheduled_ok}/{len(dest_posts)} bài")
 
         total_new += len(new_posts)
 

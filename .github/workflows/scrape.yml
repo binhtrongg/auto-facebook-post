@@ -2,8 +2,8 @@ name: Scrape & Schedule Facebook Posts
 
 on:
   schedule:
-    # Chạy mỗi 8 tiếng: 01:00, 09:00, 17:00 UTC (08:00, 16:00, 00:00 GMT+7)
-    - cron: '0 1,9,17 * * *'
+    # Chạy lúc 05:00, 13:00, 21:00 giờ Việt Nam (UTC+7) = 22:00, 06:00, 14:00 UTC
+    - cron: '0 22,6,14 * * *'
   workflow_dispatch:    # Cho phép chạy thủ công từ GitHub UI
     inputs:
       clear_dedup:
