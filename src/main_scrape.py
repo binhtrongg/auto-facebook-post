@@ -148,6 +148,7 @@ def run():
                         content      = post.get("content") or "",
                         image_urls   = post.get("image_urls") or [],
                         video_url    = post.get("video_url"),
+                        reel_url     = post.get("reel_url"),
                         scheduled_at = slot,
                     )
 

@@ -177,24 +177,15 @@ def _parse_results(raw_items: list[dict],
                          (item.get("url") if item.get("type") == "video" else None))
 
         # Reels: isVideo=True nhưng không có direct video URL
-        # → lấy thumbnail làm ảnh, thêm link reel vào content
+        # → dùng link post để Facebook tự nhúng video/reel preview
+        reel_url = None
         if not video_url and item.get("isVideo"):
-            reel_url = item.get("url", "")
-            if reel_url and "reel" in reel_url:
-                # Thêm link reel vào cuối content
-                if reel_url not in content:
-                    content = (content + "\n\n🎬 " + reel_url).strip()
-                # Lấy thumbnail từ media nếu chưa có ảnh
-                if not image_urls:
-                    for m in (item.get("media") or []):
-                        if isinstance(m, dict):
-                            thumb = m.get("thumbnail") or m.get("photo_image", {}).get("uri")
-                            if thumb:
-                                image_urls = [thumb]
-                                break
-                logger.info(f"Reel post {post_id[:20]}: dùng thumbnail + link")
+            candidate = item.get("url", "")
+            if candidate and "reel" in candidate:
+                reel_url = candidate
+                logger.info(f"Reel post {post_id[:20]}: dùng link post → {reel_url[:60]}")
 
-        if not content and not image_urls and not video_url:
+        if not content and not image_urls and not video_url and not reel_url:
             continue
 
         # Engagement metrics
@@ -217,6 +208,7 @@ def _parse_results(raw_items: list[dict],
             "content":          content,
             "image_urls":       image_urls,
             "video_url":        video_url,
+            "reel_url":         reel_url,
             "post_time":        str(post_time) if post_time else None,
             "likes":            likes,
             "comments":         comments,

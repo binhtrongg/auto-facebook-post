@@ -37,7 +37,8 @@ class FacebookPoster:
 
     def post(self, content: str, image_urls: list[str],
              video_url: str | None,
-             scheduled_at: datetime | None = None) -> str:
+             scheduled_at: datetime | None = None,
+             reel_url: str | None = None) -> str:
         """
         Đăng bài lên Page. Trả về Facebook post ID mới tạo.
         Raises exception nếu thất bại.
@@ -46,10 +47,14 @@ class FacebookPoster:
             scheduled_at: Nếu truyền vào, bài sẽ được hẹn giờ trên Facebook
                           (Facebook giữ bài và tự đăng đúng giờ).
                           Phải là timezone-aware datetime (UTC).
+            reel_url:     URL của Facebook Reel gốc — yt-dlp tải về rồi
+                          upload lên trang như video native.
         """
         scheduled_ts = _to_unix_ts(scheduled_at) if scheduled_at else None
 
-        if video_url:
+        if reel_url:
+            return self._post_reel_as_video(content, reel_url, scheduled_ts)
+        elif video_url:
             return self._post_video(content, video_url, scheduled_ts)
         elif len(image_urls) > 1:
             return self._post_multiple_images(content, image_urls, scheduled_ts)
@@ -57,6 +62,54 @@ class FacebookPoster:
             return self._post_single_image(content, image_urls[0], scheduled_ts)
         else:
             return self._post_text(content, scheduled_ts)
+
+    # ── Reel: download via yt-dlp → upload video ──────────
+
+    def _post_reel_as_video(self, content: str, reel_url: str,
+                             scheduled_ts: int | None = None) -> str:
+        """Tải Reel về bằng yt-dlp rồi upload lên Facebook như video native."""
+        import yt_dlp
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            logger.info(f"yt-dlp tải reel: {reel_url}")
+            ydl_opts = {
+                "format":   "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "outtmpl":  tmp_path,
+                "quiet":    True,
+                "no_warnings": True,
+                # Merge vào mp4 nếu cần
+                "merge_output_format": "mp4",
+                # Không dùng cache để tránh lỗi trên CI
+                "no_cache_dir": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([reel_url])
+
+            # yt-dlp có thể đổi tên file (thêm extension)
+            actual_path = tmp_path
+            if not os.path.exists(actual_path) or os.path.getsize(actual_path) == 0:
+                # Tìm file được tạo ra (yt-dlp đôi khi thêm .mp4 vào tên)
+                for candidate in [tmp_path + ".mp4", tmp_path.replace(".mp4", "") + ".mp4"]:
+                    if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
+                        actual_path = candidate
+                        break
+
+            file_size = os.path.getsize(actual_path)
+            logger.info(f"Đã tải {file_size/1024/1024:.1f}MB, upload lên Facebook...")
+
+            if file_size < 1024 * 1024:
+                return self._post_video_simple(content, actual_path, scheduled_ts)
+            else:
+                return self._post_video_resumable(content, actual_path, file_size, scheduled_ts)
+
+        finally:
+            for path in [tmp_path, tmp_path + ".mp4"]:
+                if os.path.exists(path):
+                    os.unlink(path)
+                    logger.info(f"Đã xóa file tạm: {path}")
 
     # ── Text only ──────────────────────────────────────────
 
