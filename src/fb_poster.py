@@ -76,28 +76,33 @@ class FacebookPoster:
         try:
             logger.info(f"yt-dlp tải reel: {reel_url}")
             ydl_opts = {
-                "format":   "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "outtmpl":  tmp_path,
-                "quiet":    True,
-                "no_warnings": True,
-                # Merge vào mp4 nếu cần
+                # Ưu tiên single-file mp4 để không cần ffmpeg merge
+                # Fallback: best + merge nếu có ffmpeg
+                "format":              "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best",
+                "outtmpl":             tmp_path,
                 "merge_output_format": "mp4",
-                # Không dùng cache để tránh lỗi trên CI
-                "no_cache_dir": True,
+                "no_cache_dir":        True,
+                # Raise exception khi lỗi thay vì im lặng
+                "ignoreerrors":        False,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([reel_url])
+                ret = ydl.download([reel_url])
+                if ret != 0:
+                    raise RuntimeError(f"yt-dlp trả về exit code {ret}")
 
             # yt-dlp có thể đổi tên file (thêm extension)
             actual_path = tmp_path
-            if not os.path.exists(actual_path) or os.path.getsize(actual_path) == 0:
-                # Tìm file được tạo ra (yt-dlp đôi khi thêm .mp4 vào tên)
-                for candidate in [tmp_path + ".mp4", tmp_path.replace(".mp4", "") + ".mp4"]:
-                    if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
-                        actual_path = candidate
-                        break
+            for candidate in [tmp_path, tmp_path + ".mp4",
+                               tmp_path.replace(".mp4", "") + ".mp4"]:
+                if os.path.exists(candidate) and os.path.getsize(candidate) > 0:
+                    actual_path = candidate
+                    break
+            else:
+                raise RuntimeError("yt-dlp không tạo ra file video nào")
 
             file_size = os.path.getsize(actual_path)
+            if file_size == 0:
+                raise RuntimeError("File video tải về rỗng (0 bytes)")
             logger.info(f"Đã tải {file_size/1024/1024:.1f}MB, upload lên Facebook...")
 
             if file_size < 1024 * 1024:
@@ -276,6 +281,8 @@ class FacebookPoster:
             resp = httpx.post(url, data=data,
                               files={"source": ("video.mp4", f, "video/mp4")},
                               timeout=300)
+        if resp.status_code != 200:
+            logger.error(f"Video upload lỗi {resp.status_code}: {resp.text[:500]}")
         resp.raise_for_status()
         return resp.json()["id"]
 
@@ -291,6 +298,8 @@ class FacebookPoster:
             "file_size":    str(file_size),
             "access_token": self.access_token,
         }, timeout=30)
+        if resp.status_code != 200:
+            logger.error(f"Video upload start lỗi {resp.status_code}: {resp.text[:500]}")
         resp.raise_for_status()
         init_data         = resp.json()
         upload_session_id = init_data["upload_session_id"]
