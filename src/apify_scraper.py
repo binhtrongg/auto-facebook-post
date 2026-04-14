@@ -176,8 +176,13 @@ def _parse_results(raw_items: list[dict],
         shares   = int(item.get("sharesCount")   or item.get("shares")   or 0)
         engagement_score = likes + comments * 2 + shares * 3
 
+        # Tạo URL trực tiếp đến bài gốc
+        post_url = (item.get("url") or item.get("postUrl") or
+                    f"https://www.facebook.com/permalink.php?story_fbid={post_id}&id={page_url.split('id=')[-1] if 'id=' in page_url else page_url.split('facebook.com/')[-1].rstrip('/')}")
+
         post = {
             "fb_post_id":       post_id,
+            "post_url":         post_url,
             "content":          content,
             "image_urls":       image_urls,
             "video_url":        video_url,

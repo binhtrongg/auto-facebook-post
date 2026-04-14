@@ -266,7 +266,7 @@ function _routeApi(action, params, body) {
     case "update_last_scheduled":    _updateLastScheduled(SS, body.dest_page_id, body.last_scheduled_at); return _json({ ok: true });
     case "increment_apify_usage":    _incrementApifyUsage(SS, body.api_key, parseInt(body.count) || 1); return _json({ ok: true });
     case "update_source_scraped_at": _updateSourceScrapedAt(SS, body.page_url, body.scraped_at); return _json({ ok: true });
-    case "save_log":                 _saveLog(SS, body.fb_post_id, body.destination_page_id, body.result, body.error_message || "", body.source_page_url || ""); return _json({ ok: true });
+    case "save_log":                 _saveLog(SS, body.fb_post_id, body.destination_page_id, body.result, body.error_message || "", body.source_page_url || "", body.post_url || ""); return _json({ ok: true });
     case "clear_dedup":              _clearSheet(SS, "dedup"); return _json({ ok: true });
     case "clear_schedule":           _clearSheet(SS, "schedule"); return _json({ ok: true });
     default:                         return _err("Unknown action: " + action);
@@ -345,21 +345,19 @@ function _updateSourceScrapedAt(SS, pageUrl, scrapedAt) {
   _upsertByKey(SS, "source_pages", "fb_page_url", pageUrl, "last_scraped_at", scrapedAt);
 }
 
-function _saveLog(SS, fbPostId, destPageId, result, errMsg, sourcePageUrl) {
+function _saveLog(SS, fbPostId, destPageId, result, errMsg, sourcePageUrl, postUrl) {
   var sh = SS.getSheetByName("logs");
   if (!sh) return;
   var lastCol = sh.getLastColumn();
   if (lastCol < 1) {
-    // Sheet trống: tạo lại header
-    sh.appendRow(["created_at", "fb_post_id", "destination_page_id", "result", "error_message", "source_page_url"]);
-    sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || ""]);
+    sh.appendRow(["created_at", "fb_post_id", "destination_page_id", "result", "error_message", "source_page_url", "post_url"]);
+    sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || "", postUrl || ""]);
     return;
   }
   var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  if (header.indexOf("source_page_url") === -1) {
-    sh.getRange(1, lastCol + 1).setValue("source_page_url");
-  }
-  sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || ""]);
+  if (header.indexOf("source_page_url") === -1) sh.getRange(1, lastCol + 1).setValue("source_page_url");
+  if (header.indexOf("post_url") === -1) sh.getRange(1, sh.getLastColumn() + 1).setValue("post_url");
+  sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || "", postUrl || ""]);
 }
 
 function _resetMonthlyUsageIfNeeded(SS) {
@@ -765,16 +763,17 @@ function _buildHtml(initialData) {
 
     + 'function renderLogs() {'
     + '  var rows = (D.logs || []).slice(0, 100);'
-    + '  var t = "<table><thead><tr><th>Thời gian</th><th>Trang nguồn</th><th>Post ID</th><th>Trang đích</th><th>Kết quả</th><th>Lỗi</th></tr></thead><tbody>";'
+    + '  var t = "<table><thead><tr><th>Thời gian</th><th>Trang nguồn</th><th>Bài gốc</th><th>Trang đích</th><th>Kết quả</th><th>Lỗi</th></tr></thead><tbody>";'
     + '  if (rows.length) {'
     + '    t += rows.map(function(r) {'
     + '      var ok = r.result === "scheduled" || r.result === "success";'
     + '      var res = ok ? "<span class=\\"badge g\\">" + r.result + "</span>" : "<span class=\\"badge r\\">" + r.result + "</span>";'
     + '      var srcUrl = r.source_page_url || ""; var srcParts = srcUrl.split("facebook.com/"); var src = srcParts.length > 1 ? srcParts[srcParts.length-1] : srcUrl;'
+    + '      var pUrl = r.post_url || ""; var postLink = pUrl ? "<a href=\\"" + pUrl + "\\" target=\\"_blank\\" style=\\"color:#1a73e8;font-size:11px\\">Xem bài</a>" : (r.fb_post_id || "");'
     + '      return "<tr>"'
     + '        + "<td style=\\"white-space:nowrap;font-size:11px\\">" + fmtDate(r.created_at) + "</td>"'
-    + '        + "<td style=\\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;color:#1a73e8\\">" + src + "</td>"'
-    + '        + "<td style=\\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis\\">" + (r.fb_post_id || "") + "</td>"'
+    + '        + "<td style=\\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis\\">" + src + "</td>"'
+    + '        + "<td style=\\"font-size:11px\\">" + postLink + "</td>"'
     + '        + "<td style=\\"font-size:11px\\">" + (r.destination_page_id || "") + "</td>"'
     + '        + "<td>" + res + "</td>"'
     + '        + "<td style=\\"font-size:11px;color:#e53935;max-width:180px\\">" + (r.error_message || "") + "</td>"'

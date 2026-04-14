@@ -158,6 +158,7 @@ def run():
                         destination_page_id = dest_id,
                         result              = "scheduled",
                         source_page_url     = page.get("fb_page_url", ""),
+                        post_url            = post.get("post_url", ""),
                     )
                     scheduled_ok += 1
 
