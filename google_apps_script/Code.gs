@@ -225,34 +225,44 @@ function _createTab(ss, name, rows) {
 function migrateSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Thêm cột mới vào destination_pages nếu chưa có
-  _addColumnIfMissing(ss, "destination_pages", "max_posts_per_run", "4");
-  _addColumnIfMissing(ss, "destination_pages", "post_interval_hours", "2");
+  // destination_pages: thêm cột và điền default (ít dòng nên nhanh)
+  _addColHeader(ss, "destination_pages", "max_posts_per_run");
+  _addColHeader(ss, "destination_pages", "post_interval_hours");
 
-  // Thêm cột mới vào logs nếu chưa có
-  _addColumnIfMissing(ss, "logs", "source_page_url", "");
+  // logs: chỉ thêm header, KHÔNG điền default (có thể rất nhiều dòng)
+  _addColHeader(ss, "logs", "source_page_url");
 
-  SpreadsheetApp.getUi().alert("✅ Migration hoàn tất! Các cột mới đã được thêm vào sheet.");
+  // Điền giá trị mặc định cho destination_pages (thường chỉ vài dòng)
+  _fillDefaults(ss, "destination_pages", "max_posts_per_run", "4");
+  _fillDefaults(ss, "destination_pages", "post_interval_hours", "2");
+
+  SpreadsheetApp.getUi().alert("✅ Migration hoàn tất!");
 }
 
-function _addColumnIfMissing(ss, tabName, colName, defaultValue) {
+function _addColHeader(ss, tabName, colName) {
   var sh = ss.getSheetByName(tabName);
   if (!sh) return;
   var lastCol = sh.getLastColumn();
-  if (lastCol < 1) return;
+  if (lastCol < 1) { sh.getRange(1, 1).setValue(colName); return; }
   var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  if (header.indexOf(colName) !== -1) return; // Đã có rồi
-
-  var newCol = lastCol + 1;
-  sh.getRange(1, newCol).setValue(colName);
-
-  // Điền giá trị mặc định cho tất cả dòng hiện có
-  var lastRow = sh.getLastRow();
-  if (lastRow > 1 && defaultValue !== "") {
-    var defaults = [];
-    for (var i = 1; i < lastRow; i++) defaults.push([defaultValue]);
-    sh.getRange(2, newCol, lastRow - 1, 1).setValues(defaults);
+  if (header.indexOf(colName) === -1) {
+    sh.getRange(1, lastCol + 1).setValue(colName);
   }
+}
+
+function _fillDefaults(ss, tabName, colName, defaultVal) {
+  var sh = ss.getSheetByName(tabName);
+  if (!sh) return;
+  var lastRow = sh.getLastRow();
+  if (lastRow <= 1) return;
+  var lastCol = sh.getLastColumn();
+  var header  = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var col     = header.indexOf(colName);
+  if (col === -1) return;
+  // Chỉ điền những ô đang trống
+  var vals = sh.getRange(2, col + 1, lastRow - 1, 1).getValues();
+  var updated = vals.map(function(r) { return [r[0] === "" ? defaultVal : r[0]]; });
+  sh.getRange(2, col + 1, lastRow - 1, 1).setValues(updated);
 }
 
 
