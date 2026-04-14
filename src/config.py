@@ -33,7 +33,7 @@ APIFY_KEY_SAFE_LIMIT = 450
 
 # ── Lịch scrape / đăng ────────────────────────────────────
 SCRAPE_INTERVAL_HOURS        = 8    # Scrape 3 lần / ngày
-SCRAPE_LOOKBACK_HOURS        = 8    # Chỉ lấy bài trong 8 tiếng qua
+SCRAPE_LOOKBACK_HOURS        = 24   # Lấy bài trong 24 tiếng qua (dedup ngăn đăng lại)
 POST_INTERVAL_MIN_MINUTES    = 60   # Mặc định nếu trang đích không cài
 POST_INTERVAL_MAX_MINUTES    = 120  # (được ghi đè bởi post_interval_hours trong sheet)
 DEFAULT_MAX_POSTS_PER_RUN    = 4    # Mặc định nếu trang đích không cài

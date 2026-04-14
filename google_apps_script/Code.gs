@@ -221,6 +221,40 @@ function _createTab(ss, name, rows) {
   if (rows && rows.length) sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 }
 
+// Chạy hàm này 1 lần sau khi update Code.gs để thêm cột mới vào sheet cũ
+function migrateSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Thêm cột mới vào destination_pages nếu chưa có
+  _addColumnIfMissing(ss, "destination_pages", "max_posts_per_run", "4");
+  _addColumnIfMissing(ss, "destination_pages", "post_interval_hours", "2");
+
+  // Thêm cột mới vào logs nếu chưa có
+  _addColumnIfMissing(ss, "logs", "source_page_url", "");
+
+  SpreadsheetApp.getUi().alert("✅ Migration hoàn tất! Các cột mới đã được thêm vào sheet.");
+}
+
+function _addColumnIfMissing(ss, tabName, colName, defaultValue) {
+  var sh = ss.getSheetByName(tabName);
+  if (!sh) return;
+  var lastCol = sh.getLastColumn();
+  if (lastCol < 1) return;
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (header.indexOf(colName) !== -1) return; // Đã có rồi
+
+  var newCol = lastCol + 1;
+  sh.getRange(1, newCol).setValue(colName);
+
+  // Điền giá trị mặc định cho tất cả dòng hiện có
+  var lastRow = sh.getLastRow();
+  if (lastRow > 1 && defaultValue !== "") {
+    var defaults = [];
+    for (var i = 1; i < lastRow; i++) defaults.push([defaultValue]);
+    sh.getRange(2, newCol, lastRow - 1, 1).setValues(defaults);
+  }
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 // API ROUTER (cho Python script)
@@ -319,10 +353,17 @@ function _updateSourceScrapedAt(SS, pageUrl, scrapedAt) {
 
 function _saveLog(SS, fbPostId, destPageId, result, errMsg, sourcePageUrl) {
   var sh = SS.getSheetByName("logs");
-  // Đảm bảo header có cột source_page_url
-  var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (!sh) return;
+  var lastCol = sh.getLastColumn();
+  if (lastCol < 1) {
+    // Sheet trống: tạo lại header
+    sh.appendRow(["created_at", "fb_post_id", "destination_page_id", "result", "error_message", "source_page_url"]);
+    sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || ""]);
+    return;
+  }
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
   if (header.indexOf("source_page_url") === -1) {
-    sh.getRange(1, header.length + 1).setValue("source_page_url");
+    sh.getRange(1, lastCol + 1).setValue("source_page_url");
   }
   sh.appendRow([new Date().toISOString(), String(fbPostId), String(destPageId), result, errMsg || "", sourcePageUrl || ""]);
 }
@@ -730,13 +771,15 @@ function _buildHtml(initialData) {
 
     + 'function renderLogs() {'
     + '  var rows = (D.logs || []).slice(0, 100);'
-    + '  var t = "<table><thead><tr><th>Thời gian</th><th>Post ID</th><th>Trang đích</th><th>Kết quả</th><th>Lỗi</th></tr></thead><tbody>";'
+    + '  var t = "<table><thead><tr><th>Thời gian</th><th>Trang nguồn</th><th>Post ID</th><th>Trang đích</th><th>Kết quả</th><th>Lỗi</th></tr></thead><tbody>";'
     + '  if (rows.length) {'
     + '    t += rows.map(function(r) {'
     + '      var ok = r.result === "scheduled" || r.result === "success";'
     + '      var res = ok ? "<span class=\\"badge g\\">" + r.result + "</span>" : "<span class=\\"badge r\\">" + r.result + "</span>";'
+    + '      var src = (r.source_page_url || "").replace(/.*facebook\\.com\\//, "");'
     + '      return "<tr>"'
     + '        + "<td style=\\"white-space:nowrap;font-size:11px\\">" + fmtDate(r.created_at) + "</td>"'
+    + '        + "<td style=\\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;color:#1a73e8\\">" + src + "</td>"'
     + '        + "<td style=\\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis\\">" + (r.fb_post_id || "") + "</td>"'
     + '        + "<td style=\\"font-size:11px\\">" + (r.destination_page_id || "") + "</td>"'
     + '        + "<td>" + res + "</td>"'
@@ -744,7 +787,7 @@ function _buildHtml(initialData) {
     + '        + "</tr>";'
     + '    }).join("");'
     + '  } else {'
-    + '    t += "<tr><td colspan=5 class=empty>Chưa có log</td></tr>";'
+    + '    t += "<tr><td colspan=6 class=empty>Chưa có log</td></tr>";'
     + '  }'
     + '  t += "</tbody></table>";'
     + '  document.getElementById("logs-dash").innerHTML = t;'
