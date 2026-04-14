@@ -45,7 +45,13 @@ def _post(action: str, **body) -> dict:
         follow_redirects=True,
     )
     resp.raise_for_status()
-    return resp.json()
+    if not resp.content or not resp.text.strip():
+        return {}
+    try:
+        return resp.json()
+    except Exception:
+        logger.warning(f"_post({action}): response không phải JSON: {resp.text[:100]}")
+        return {}
 
 
 # ── Source Pages ───────────────────────────────────────────
