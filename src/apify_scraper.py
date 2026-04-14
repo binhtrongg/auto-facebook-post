@@ -176,13 +176,23 @@ def _parse_results(raw_items: list[dict],
                          item.get("videoSdUrl") or item.get("video_url") or
                          (item.get("url") if item.get("type") == "video" else None))
 
-        # Debug: dump toàn bộ keys của post không có media
-        if not image_urls and not video_url and post_id in (
-            "122301353984081724", "122301433130081724", "122301355412081724"
-        ):
-            import json as _json
-            safe_item = {k: v for k, v in item.items() if k != "access_token"}
-            logger.info(f"[RAW_ITEM] {post_id[:20]}: {_json.dumps(safe_item, ensure_ascii=False)[:1000]}")
+        # Reels: isVideo=True nhưng không có direct video URL
+        # → lấy thumbnail làm ảnh, thêm link reel vào content
+        if not video_url and item.get("isVideo"):
+            reel_url = item.get("url", "")
+            if reel_url and "reel" in reel_url:
+                # Thêm link reel vào cuối content
+                if reel_url not in content:
+                    content = (content + "\n\n🎬 " + reel_url).strip()
+                # Lấy thumbnail từ media nếu chưa có ảnh
+                if not image_urls:
+                    for m in (item.get("media") or []):
+                        if isinstance(m, dict):
+                            thumb = m.get("thumbnail") or m.get("photo_image", {}).get("uri")
+                            if thumb:
+                                image_urls = [thumb]
+                                break
+                logger.info(f"Reel post {post_id[:20]}: dùng thumbnail + link")
 
         if not content and not image_urls and not video_url:
             continue
@@ -193,9 +203,13 @@ def _parse_results(raw_items: list[dict],
         shares   = int(item.get("sharesCount")   or item.get("shares")   or 0)
         engagement_score = likes + comments * 2 + shares * 3
 
-        # Tạo URL trực tiếp đến bài gốc
-        post_url = (item.get("url") or item.get("postUrl") or
-                    f"https://www.facebook.com/permalink.php?story_fbid={post_id}&id={page_url.split('id=')[-1] if 'id=' in page_url else page_url.split('facebook.com/')[-1].rstrip('/')}")
+        # URL bài gốc: reel dùng item.url, còn lại dùng permalink
+        item_url = item.get("url") or item.get("postUrl") or ""
+        if item_url and ("reel" in item_url or "story" in item_url or "/posts/" in item_url):
+            post_url = item_url
+        else:
+            page_slug = page_url.split("id=")[-1] if "id=" in page_url else page_url.split("facebook.com/")[-1].rstrip("/")
+            post_url = f"https://www.facebook.com/permalink.php?story_fbid={post_id}&id={page_slug}"
 
         post = {
             "fb_post_id":       post_id,

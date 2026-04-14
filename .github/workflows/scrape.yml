@@ -53,5 +53,5 @@ jobs:
           DB_BACKEND: sheets
           GOOGLE_WEBAPP_URL: ${{ secrets.GOOGLE_WEBAPP_URL }}
           WEBAPP_SECRET: ${{ secrets.WEBAPP_SECRET }}
-          LOG_LEVEL: DEBUG
+          LOG_LEVEL: INFO
         run: python -m src.main_scrape
