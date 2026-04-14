@@ -176,18 +176,13 @@ def _parse_results(raw_items: list[dict],
                          item.get("videoSdUrl") or item.get("video_url") or
                          (item.get("url") if item.get("type") == "video" else None))
 
-        # Debug: log keys của post không có media để tìm field chứa video/reels
-        if not image_urls and not video_url:
-            all_keys = list(item.keys())
-            video_keys = [k for k in all_keys if "video" in k.lower() or "reel" in k.lower() or "attach" in k.lower()]
-            if video_keys or item.get("media"):
-                logger.debug(f"Post {post_id[:20]} no-media keys: {video_keys}, media={item.get('media')}")
-            # Check thêm các field video phổ biến
-            raw_video = (item.get("video") or item.get("videoUrl") or
-                         item.get("attachments") or item.get("videoHdUrl") or
-                         item.get("videoSdUrl"))
-            if raw_video and not video_url:
-                logger.info(f"Post {post_id[:20]} has raw video field: {str(raw_video)[:150]}")
+        # Debug: dump toàn bộ keys của post không có media
+        if not image_urls and not video_url and post_id in (
+            "122301353984081724", "122301433130081724", "122301355412081724"
+        ):
+            import json as _json
+            safe_item = {k: v for k, v in item.items() if k != "access_token"}
+            logger.info(f"[RAW_ITEM] {post_id[:20]}: {_json.dumps(safe_item, ensure_ascii=False)[:1000]}")
 
         if not content and not image_urls and not video_url:
             continue
