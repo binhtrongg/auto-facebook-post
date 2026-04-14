@@ -162,10 +162,32 @@ def _parse_results(raw_items: list[dict],
 
         # Extract media
         image_urls, video_url = _extract_media(item.get("media") or [])
+
+        # Fallback: video/reels ở top-level
         if not video_url:
-            video_url = (item.get("videoUrl") or
-                         item.get("video_url") or
+            video_obj = item.get("video")
+            if isinstance(video_obj, dict):
+                video_url = (video_obj.get("url") or video_obj.get("hdUrl") or
+                             video_obj.get("sdUrl") or video_obj.get("videoUrl"))
+            elif isinstance(video_obj, str) and video_obj:
+                video_url = video_obj
+        if not video_url:
+            video_url = (item.get("videoUrl") or item.get("videoHdUrl") or
+                         item.get("videoSdUrl") or item.get("video_url") or
                          (item.get("url") if item.get("type") == "video" else None))
+
+        # Debug: log keys của post không có media để tìm field chứa video/reels
+        if not image_urls and not video_url:
+            all_keys = list(item.keys())
+            video_keys = [k for k in all_keys if "video" in k.lower() or "reel" in k.lower() or "attach" in k.lower()]
+            if video_keys or item.get("media"):
+                logger.debug(f"Post {post_id[:20]} no-media keys: {video_keys}, media={item.get('media')}")
+            # Check thêm các field video phổ biến
+            raw_video = (item.get("video") or item.get("videoUrl") or
+                         item.get("attachments") or item.get("videoHdUrl") or
+                         item.get("videoSdUrl"))
+            if raw_video and not video_url:
+                logger.info(f"Post {post_id[:20]} has raw video field: {str(raw_video)[:150]}")
 
         if not content and not image_urls and not video_url:
             continue
