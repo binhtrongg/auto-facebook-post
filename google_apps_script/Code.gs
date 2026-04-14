@@ -23,9 +23,12 @@ function doGet(e) {
   // Không có action → giao diện quản lý
   if (!action) {
     var initialData = {};
-    try { initialData = uiGetConfig(); } catch(e) { initialData = {groups:[],sources:[],dests:[],apify_keys:[],dedup_count:0}; }
+    try { initialData = uiGetConfig(); } catch(err) { initialData = {groups:[],sources:[],dests:[],apify_keys:[],dedup_count:0}; }
+    var html;
+    try { html = _buildHtml(initialData); }
+    catch(err2) { html = "<pre style='color:red;padding:20px'>Lỗi tạo giao diện: " + err2.toString() + "</pre>"; }
     return HtmlService
-      .createHtmlOutput(_buildHtml(initialData))
+      .createHtmlOutput(html)
       .setTitle("Auto Facebook Post")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
@@ -767,7 +770,7 @@ function _buildHtml(initialData) {
     + '    t += rows.map(function(r) {'
     + '      var ok = r.result === "scheduled" || r.result === "success";'
     + '      var res = ok ? "<span class=\\"badge g\\">" + r.result + "</span>" : "<span class=\\"badge r\\">" + r.result + "</span>";'
-    + '      var src = (r.source_page_url || "").replace(/.*facebook\\.com\\//, "");'
+    + '      var srcUrl = r.source_page_url || ""; var srcParts = srcUrl.split("facebook.com/"); var src = srcParts.length > 1 ? srcParts[srcParts.length-1] : srcUrl;'
     + '      return "<tr>"'
     + '        + "<td style=\\"white-space:nowrap;font-size:11px\\">" + fmtDate(r.created_at) + "</td>"'
     + '        + "<td style=\\"font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;color:#1a73e8\\">" + src + "</td>"'
