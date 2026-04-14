@@ -140,15 +140,24 @@ class FacebookPoster:
         }, timeout=60)
 
         if resp.status_code != 200:
-            logger.warning(f"URL upload thất bại ({resp.status_code}), thử download binary...")
+            logger.warning(f"URL upload thất bại ({resp.status_code}): {resp.text[:200]}")
+            logger.info("Thử download binary...")
             image_data = _download_bytes(image_url, MAX_IMAGE_SIZE)
-            logger.info(f"Đã download {len(image_data)/1024:.0f}KB, upload binary...")
+
+            # Tự detect MIME type từ magic bytes
+            mime = _detect_mime(image_data)
+            ext  = {"image/png": "png", "image/gif": "gif",
+                    "image/webp": "webp"}.get(mime, "jpg")
+            logger.info(f"Download {len(image_data)/1024:.0f}KB, mime={mime}, upload binary...")
+
             resp = httpx.post(url, data={
                 "published":    "false",
                 "access_token": self.access_token,
-            }, files={"source": ("image.jpg", image_data, "image/jpeg")},
+            }, files={"source": (f"image.{ext}", image_data, mime)},
             timeout=60)
             logger.info(f"Binary upload status: {resp.status_code}")
+            if resp.status_code != 200:
+                logger.error(f"Binary upload lỗi: {resp.text[:300]}")
 
         resp.raise_for_status()
         photo_id = resp.json()["id"]
@@ -292,6 +301,17 @@ def _download_bytes(url: str, max_size: int) -> bytes:
                 raise ValueError(f"File quá lớn (>{max_size/1024/1024:.0f}MB)")
             chunks.append(chunk)
         return b"".join(chunks)
+
+
+def _detect_mime(data: bytes) -> str:
+    """Detect MIME type từ magic bytes."""
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        return "image/png"
+    if data[:6] in (b'GIF87a', b'GIF89a'):
+        return "image/gif"
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return "image/webp"
+    return "image/jpeg"  # default
 
 
 def _stream_download_to_file(url: str, dest_path: str, max_size: int):
