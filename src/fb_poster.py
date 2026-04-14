@@ -72,6 +72,8 @@ class FacebookPoster:
 
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
             tmp_path = tmp.name
+        # Xóa file rỗng để yt-dlp không bỏ qua vì "đã tồn tại"
+        os.unlink(tmp_path)
 
         try:
             logger.info(f"yt-dlp tải reel: {reel_url}")
