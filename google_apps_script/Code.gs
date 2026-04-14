@@ -225,44 +225,25 @@ function _createTab(ss, name, rows) {
 function migrateSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // destination_pages: thêm cột và điền default (ít dòng nên nhanh)
-  _addColHeader(ss, "destination_pages", "max_posts_per_run");
-  _addColHeader(ss, "destination_pages", "post_interval_hours");
-
-  // logs: chỉ thêm header, KHÔNG điền default (có thể rất nhiều dòng)
-  _addColHeader(ss, "logs", "source_page_url");
-
-  // Điền giá trị mặc định cho destination_pages (thường chỉ vài dòng)
-  _fillDefaults(ss, "destination_pages", "max_posts_per_run", "4");
-  _fillDefaults(ss, "destination_pages", "post_interval_hours", "2");
-
-  SpreadsheetApp.getUi().alert("✅ Migration hoàn tất!");
-}
-
-function _addColHeader(ss, tabName, colName) {
-  var sh = ss.getSheetByName(tabName);
-  if (!sh) return;
-  var lastCol = sh.getLastColumn();
-  if (lastCol < 1) { sh.getRange(1, 1).setValue(colName); return; }
-  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  if (header.indexOf(colName) === -1) {
-    sh.getRange(1, lastCol + 1).setValue(colName);
+  // destination_pages: chỉ thêm header + 2 cột ở cuối hàng 1
+  var dp = ss.getSheetByName("destination_pages");
+  if (dp) {
+    var dpHeader = dp.getRange(1, 1, 1, dp.getLastColumn()).getValues()[0];
+    if (dpHeader.indexOf("max_posts_per_run") === -1)
+      dp.getRange(1, dp.getLastColumn() + 1).setValue("max_posts_per_run");
+    if (dpHeader.indexOf("post_interval_hours") === -1)
+      dp.getRange(1, dp.getLastColumn() + 1).setValue("post_interval_hours");
   }
-}
 
-function _fillDefaults(ss, tabName, colName, defaultVal) {
-  var sh = ss.getSheetByName(tabName);
-  if (!sh) return;
-  var lastRow = sh.getLastRow();
-  if (lastRow <= 1) return;
-  var lastCol = sh.getLastColumn();
-  var header  = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  var col     = header.indexOf(colName);
-  if (col === -1) return;
-  // Chỉ điền những ô đang trống
-  var vals = sh.getRange(2, col + 1, lastRow - 1, 1).getValues();
-  var updated = vals.map(function(r) { return [r[0] === "" ? defaultVal : r[0]]; });
-  sh.getRange(2, col + 1, lastRow - 1, 1).setValues(updated);
+  // logs: chỉ thêm header ô cuối hàng 1, không đụng data
+  var lg = ss.getSheetByName("logs");
+  if (lg && lg.getLastColumn() > 0) {
+    var lgHeader = lg.getRange(1, 1, 1, lg.getLastColumn()).getValues()[0];
+    if (lgHeader.indexOf("source_page_url") === -1)
+      lg.getRange(1, lg.getLastColumn() + 1).setValue("source_page_url");
+  }
+
+  Browser.msgBox("✅ Migration xong! Hãy vào sheet destination_pages điền max_posts_per_run và post_interval_hours cho từng trang đích.");
 }
 
 
