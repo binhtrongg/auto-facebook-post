@@ -93,7 +93,8 @@ class FacebookPoster:
                 "merge_output_format": "mp4",
                 "no_cache_dir":        True,
                 "ignoreerrors":        False,
-                "verbose":             True,
+                "quiet":               True,
+                "no_warnings":         False,
             }
             if cookie_file and os.path.exists(cookie_file):
                 ydl_opts["cookiefile"] = cookie_file

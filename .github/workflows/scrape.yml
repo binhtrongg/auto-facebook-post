@@ -16,7 +16,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -30,8 +30,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install ffmpeg
-        run: sudo apt-get install -y ffmpeg
+      - name: Setup ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: release
+          github-token: ${{ github.token }}
 
       - name: Install dependencies
         run: pip install -r requirements.txt

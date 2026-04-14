@@ -183,7 +183,7 @@ def _parse_results(raw_items: list[dict],
             candidate = item.get("url", "")
             if candidate and "reel" in candidate:
                 reel_url = candidate
-                logger.info(f"Reel post {post_id[:20]}: dùng link post → {reel_url[:60]}")
+                logger.info(f"Reel post {post_id[:20]}: sẽ tải video qua yt-dlp → {reel_url[:60]}")
 
         if not content and not image_urls and not video_url and not reel_url:
             continue
