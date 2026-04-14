@@ -75,6 +75,7 @@ class FacebookPoster:
 
         try:
             logger.info(f"yt-dlp tải reel: {reel_url}")
+            cookie_file = os.environ.get("FACEBOOK_COOKIE_FILE", "")
             ydl_opts = {
                 # Ưu tiên single-file mp4 để không cần ffmpeg merge
                 # Fallback: best + merge nếu có ffmpeg
@@ -85,6 +86,9 @@ class FacebookPoster:
                 # Raise exception khi lỗi thay vì im lặng
                 "ignoreerrors":        False,
             }
+            if cookie_file and os.path.exists(cookie_file):
+                ydl_opts["cookiefile"] = cookie_file
+                logger.info(f"Dùng cookie file: {cookie_file}")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ret = ydl.download([reel_url])
                 if ret != 0:

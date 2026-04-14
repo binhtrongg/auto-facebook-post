@@ -17,6 +17,8 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
@@ -33,6 +35,12 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Tạo Facebook cookies file
+        if: ${{ secrets.FACEBOOK_COOKIES != '' }}
+        run: |
+          echo "${{ secrets.FACEBOOK_COOKIES }}" > /tmp/fb_cookies.txt
+          echo "FACEBOOK_COOKIE_FILE=/tmp/fb_cookies.txt" >> $GITHUB_ENV
 
       - name: Xóa dedup (nếu được yêu cầu)
         if: ${{ github.event.inputs.clear_dedup == 'true' }}
