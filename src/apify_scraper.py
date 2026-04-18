@@ -12,7 +12,7 @@ import httpx
 from dateutil.parser import isoparse
 
 from src.config import APIFY_ACTOR_ID, MAX_POSTS_PER_PAGE, SCRAPE_LOOKBACK_HOURS
-from src.key_rotator import get_active_key, increment_key_usage
+from src.key_rotator import get_active_key, increment_key_usage, mark_key_exhausted
 
 logger = logging.getLogger(__name__)
 
@@ -24,36 +24,44 @@ POLL_INTERVAL   = 10    # kiểm tra kết quả mỗi 10 giây
 def scrape_pages(page_urls: list[str]) -> dict[str, list[dict]]:
     """
     Scrape nhiều Facebook page cùng lúc trong 1 actor run.
+    Tự động thử key khác nếu key hiện tại lỗi (tối đa 3 key).
 
     Returns:
         {page_url: [list of posts]}
         Mỗi post: {fb_post_id, content, image_urls, video_url, post_time}
     """
-    api_key = get_active_key()
-    if not api_key:
-        raise RuntimeError("Không có Apify API key khả dụng")
-
-    logger.info(f"Bắt đầu scrape {len(page_urls)} trang...")
-
     actor_input = {
         "startUrls": [{"url": url} for url in page_urls],
         "maxPosts":  MAX_POSTS_PER_PAGE,
     }
 
-    run_id, dataset_id = _start_actor_run(api_key, actor_input)
-    if not run_id:
-        return {}
+    for attempt in range(3):
+        api_key = get_active_key()
+        if not api_key:
+            raise RuntimeError("Không có Apify API key khả dụng")
 
-    success = _wait_for_run(api_key, run_id)
-    if not success:
-        logger.error(f"Actor run {run_id} thất bại hoặc timeout")
-        return {}
+        logger.info(f"Bắt đầu scrape {len(page_urls)} trang (key: {api_key[:20]}...)...")
 
-    raw_items = _fetch_dataset(api_key, dataset_id)
-    increment_key_usage(api_key, count=len(page_urls))
+        run_id, dataset_id = _start_actor_run(api_key, actor_input)
+        if not run_id:
+            logger.warning(f"Key lỗi khi khởi chạy actor → chuyển sang key khác")
+            mark_key_exhausted(api_key)
+            continue
 
-    since = datetime.now(timezone.utc) - timedelta(hours=SCRAPE_LOOKBACK_HOURS)
-    return _parse_results(raw_items, page_urls, since)
+        success = _wait_for_run(api_key, run_id)
+        if not success:
+            logger.warning(f"Actor run {run_id} thất bại → chuyển sang key khác")
+            mark_key_exhausted(api_key)
+            continue
+
+        raw_items = _fetch_dataset(api_key, dataset_id)
+        increment_key_usage(api_key, count=len(page_urls))
+
+        since = datetime.now(timezone.utc) - timedelta(hours=SCRAPE_LOOKBACK_HOURS)
+        return _parse_results(raw_items, page_urls, since)
+
+    logger.error("Đã thử 3 key, tất cả đều lỗi")
+    return {}
 
 
 def _start_actor_run(api_key: str,

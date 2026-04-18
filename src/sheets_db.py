@@ -125,3 +125,8 @@ def get_active_apify_key(_safe_limit: int = 450) -> str | None:
 
 def increment_apify_key_usage(api_key: str, count: int = 1):
     _post("increment_apify_usage", api_key=api_key, count=count)
+
+
+def mark_apify_key_exhausted(api_key: str):
+    """Đánh dấu key lỗi/hết quota bằng cách đẩy usage lên cao để không được chọn nữa."""
+    _post("increment_apify_usage", api_key=api_key, count=500)

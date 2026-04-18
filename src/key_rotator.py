@@ -30,6 +30,16 @@ def increment_key_usage(api_key: str, count: int = 1):
         _supabase_increment_key_usage(api_key, count)
 
 
+def mark_key_exhausted(api_key: str):
+    """Đánh dấu key lỗi/hết quota → hệ thống sẽ chuyển sang key khác."""
+    logger.warning(f"Đánh dấu key exhausted: {api_key[:20]}...")
+    if DB_BACKEND == "sheets":
+        from src.sheets_db import mark_apify_key_exhausted
+        mark_apify_key_exhausted(api_key)
+    else:
+        _supabase_increment_key_usage(api_key, count=500)
+
+
 # ── Supabase implementation ────────────────────────────────
 
 def _supabase_get_active_key() -> str | None:
