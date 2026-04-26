@@ -96,58 +96,37 @@ Apify is used to scrape Facebook Pages without needing a browser or Facebook log
 
 The tool uses Google Sheets as a free database via Google Apps Script.
 
-#### 2.1 Create the Google Sheet
+#### 2.1 Create the Google Sheet & Run Setup
 
-1. Go to [sheets.google.com](https://sheets.google.com) → create a new spreadsheet
-2. Create these tabs (exact names):
-   - `source_pages`
-   - `destination_pages`
-   - `apify_keys`
-   - `dedup`
-   - `logs`
-   - `page_groups`
+1. Go to [sheets.google.com](https://sheets.google.com) → create a new **blank** spreadsheet
+2. Open **Extensions → Apps Script**
+3. Paste the full content of [`google_apps_script/Code.gs`](google_apps_script/Code.gs) into the editor
+4. Click **Save** (💾), then click **Run → `setupSpreadsheet`**
+5. Grant permissions when prompted
 
-**Tab headers:**
+The `setupSpreadsheet()` function will **automatically create all 7 tabs** with correct headers and sample data rows:
 
-`source_pages`:
-```
-id | fb_page_url | fb_page_name | group_id | is_active | scraped_at
-```
+| Tab | Purpose |
+|-----|---------|
+| `groups` | Page groups (links source ↔ destination) |
+| `source_pages` | Facebook pages to scrape from |
+| `destination_pages` | Facebook pages to post to |
+| `apify_keys` | Apify API key rotation |
+| `dedup` | Deduplication log (auto-managed) |
+| `logs` | Post history log (auto-managed) |
+| `schedule` | Scheduled post slots (auto-managed) |
 
-`destination_pages`:
-```
-id | fb_page_id | fb_page_name | fb_access_token | group_id | is_active | max_posts_per_run | post_interval_hours | last_scheduled_at
-```
+A popup will confirm: **"✅ Setup hoàn tất! 7 tabs đã được tạo."**
 
-`apify_keys`:
-```
-id | api_key | email | usage_count | monthly_limit | is_active | last_used_at | reset_at
-```
-
-`dedup`:
-```
-fb_post_id | source_page_id | dest_page_id | created_at
-```
-
-`logs`:
-```
-id | created_at | fb_post_id | destination_page_id | result | error_message | source_page_url | post_url
-```
-
-`page_groups`:
-```
-id | name | is_active | created_at
-```
+> **Note:** If you already have a Sheet with existing tabs, `setupSpreadsheet()` will skip tabs that already exist — safe to run again.
 
 #### 2.2 Deploy Google Apps Script Web App
 
-1. In your Google Sheet: **Extensions → Apps Script**
-2. Paste the code from [`google_apps_script/Code.gs`](google_apps_script/Code.gs)
-3. Click **Deploy → New deployment → Web App**:
+1. In the same Apps Script editor: **Deploy → New deployment → Web App**:
    - Execute as: **Me**
    - Who has access: **Anyone**
-4. Copy the **Web App URL** (format: `https://script.google.com/macros/s/XXXX/exec`)
-5. In Apps Script: **Project Settings → Script Properties** → add:
+2. Click **Deploy** → copy the **Web App URL** (format: `https://script.google.com/macros/s/XXXX/exec`)
+3. Go to **Project Settings → Script Properties** → add:
    - Key: `WEBAPP_SECRET` — Value: any secret string you choose (e.g., `my_secret_abc123`)
 
 ---
@@ -383,13 +362,15 @@ Apify dùng để scrape Facebook Page mà không cần đăng nhập Facebook.
 
 ### Bước 2 — Thiết Lập Google Sheet
 
-#### 2.1 Tạo Google Sheet
+#### 2.1 Tạo Google Sheet & Chạy Setup Tự Động
 
-1. Vào [sheets.google.com](https://sheets.google.com) → tạo spreadsheet mới
-2. Tạo các tab sau (tên chính xác):
-   - `source_pages`, `destination_pages`, `apify_keys`, `dedup`, `logs`, `page_groups`
+1. Vào [sheets.google.com](https://sheets.google.com) → tạo spreadsheet **trống** mới
+2. Vào **Extensions → Apps Script**
+3. Paste toàn bộ nội dung file [`google_apps_script/Code.gs`](google_apps_script/Code.gs) vào editor
+4. Click **Save** (💾), sau đó click **Run → `setupSpreadsheet`**
+5. Cho phép quyền khi được hỏi
 
-(Xem cột chi tiết ở phần English Guide bên trên)
+Hàm `setupSpreadsheet()` sẽ **tự động tạo đủ 7 tabs** với header và dữ liệu mẫu. Sau khi chạy xong sẽ hiện thông báo: **"✅ Setup hoàn tất! 7 tabs đã được tạo."**
 
 #### 2.2 Deploy Google Apps Script
 
