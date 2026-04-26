@@ -97,7 +97,7 @@ Kết quả trả về danh sách tất cả pages bạn quản lý:
       "access_token": "EAAxxxPAGE_TOKEN_VINH_VIENxxx",
       "category": "News & Media",
       "name": "Tên Trang",
-      "id": "714759535606831",
+      "id": "123456789012345",
       "tasks": ["ANALYZE", "ADVERTISE", "MODERATE", "CREATE_CONTENT"]
     },
     ...
@@ -135,10 +135,10 @@ Mở Google Sheet → tab **destination_pages** → thêm hàng mới:
 
 | Cột | Giá trị | Ví dụ |
 |-----|---------|-------|
-| `fb_page_id` | ID số của trang | `714759535606831` |
-| `fb_page_name` | Tên trang (để nhận biết) | `Tân Mai News` |
+| `fb_page_id` | ID số của trang | `123456789012345` |
+| `fb_page_name` | Tên trang (để nhận biết) | `Page A` |
 | `fb_access_token` | Page Token vĩnh viễn từ Bước 3.3 | `EAABxxx...` |
-| `group_id` | Tên nhóm (phải trùng source pages) | `Công an phường Tân Mai` |
+| `group_id` | Tên nhóm (phải trùng source pages) | `Group A` |
 | `max_posts_per_run` | Số bài tối đa mỗi lần chạy | `4` |
 | `post_interval_hours` | Khoảng cách giữa 2 bài (giờ) | `2` |
 

@@ -215,7 +215,7 @@ Sau khi có token:
 Tìm thấy X trang nguồn trong Y nhóm
 → Z bài mới (đã sắp xếp theo tương tác)
   Bài 1: id=... | imgs=X | video=có/không | ❤️likes 💬comments 🔁shares
-Tân Mai News: lên lịch X/Y bài (max=4, interval=2h)
+Page A: lên lịch X/Y bài (max=4, interval=2h)
 KẾT THÚC: +X bài mới | Y lỗi
 ```
 
