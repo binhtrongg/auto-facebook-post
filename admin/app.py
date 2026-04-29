@@ -138,7 +138,7 @@ if page == "📊 Tổng quan":
                     {
                         "Thời gian": log["created_at"][:16].replace("T", " "),
                         "Kết quả": "✓ Thành công"
-                        if log["result"] == "success"
+                        if log["result"] in ("success", "scheduled")
                         else "✗ Thất bại",
                         "Lỗi": log.get("error_message") or "",
                     }
@@ -628,7 +628,7 @@ elif page == "📋 Logs":
 
     if logs:
         # Thống kê nhanh
-        success_count = sum(1 for l in logs if l["result"] == "success")
+        success_count = sum(1 for l in logs if l["result"] in ("success", "scheduled"))
         fail_count = sum(1 for l in logs if l["result"] == "failed")
         c1, c2, c3 = st.columns(3)
         c1.metric("Tổng", len(logs))
@@ -640,7 +640,9 @@ elif page == "📋 Logs":
             rows.append(
                 {
                     "Thời gian": log["created_at"][:16].replace("T", " "),
-                    "Kết quả": "✓ OK" if log["result"] == "success" else "✗ Fail",
+                    "Kết quả": "✓ OK"
+                    if log["result"] in ("success", "scheduled")
+                    else "✗ Fail",
                     "Post ID": (log.get("fb_post_id") or "")[:20],
                     "Lỗi": (log.get("error_message") or "")[:80],
                 }
