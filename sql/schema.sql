@@ -89,7 +89,7 @@ CREATE TABLE scheduled_posts (
     destination_page_id  UUID REFERENCES destination_pages(id),
     scheduled_at         TIMESTAMP WITH TIME ZONE NOT NULL,
     status               TEXT DEFAULT 'pending'
-                         CHECK (status IN ('pending','posted','failed')),
+                         CHECK (status IN ('pending','scheduled','posted','failed')),
     retry_count          INTEGER DEFAULT 0,
     created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

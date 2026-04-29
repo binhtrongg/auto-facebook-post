@@ -11,6 +11,7 @@ Flow mới (schedule trực tiếp lên Facebook):
      → Lưu dedup để tránh đăng lại
   4. KHÔNG cần job post riêng (main_post.py không cần nữa)
 """
+
 import logging
 import sys
 from datetime import datetime, timezone
@@ -33,6 +34,8 @@ else:
         is_post_exists,
         save_dedup,
         save_log,
+        save_post,
+        create_scheduled_post,
         update_source_page_scraped_at,
     )
 from src.apify_scraper import scrape_pages
@@ -64,14 +67,14 @@ def run():
 
     logger.info(f"Tìm thấy {len(all_pages)} trang nguồn trong {len(groups)} nhóm")
 
-    total_new     = 0
-    total_errors  = 0
+    total_new = 0
+    total_errors = 0
 
     for group_id, pages in groups.items():
         group_name = pages[0].get("page_groups", {}).get("name", group_id[:8])
         logger.info(f"\n--- Nhóm: {group_name} ({len(pages)} trang) ---")
 
-        page_urls   = [p["fb_page_url"] for p in pages]
+        page_urls = [p["fb_page_url"] for p in pages]
         url_to_page = {p["fb_page_url"]: p for p in pages}
 
         # Scrape
@@ -107,10 +110,10 @@ def run():
         logger.info(f"  → {len(new_posts)} bài mới (đã sắp xếp theo tương tác):")
         for i, (p, _) in enumerate(new_posts):
             logger.info(
-                f"    Bài {i+1}: id={p['fb_post_id'][:20]} | "
+                f"    Bài {i + 1}: id={p['fb_post_id'][:20]} | "
                 f"imgs={len(p.get('image_urls') or [])} | "
                 f"video={'có' if p.get('video_url') else 'không'} | "
-                f"❤️{p.get('likes',0)} 💬{p.get('comments',0)} 🔁{p.get('shares',0)}"
+                f"❤️{p.get('likes', 0)} 💬{p.get('comments', 0)} 🔁{p.get('shares', 0)}"
             )
 
         # Lấy danh sách trang đích
@@ -121,13 +124,13 @@ def run():
 
         # Với mỗi trang đích → giới hạn số bài + tính lịch riêng
         for dest in destinations:
-            dest_id   = dest["id"]
+            dest_id = dest["id"]
             dest_name = dest.get("fb_page_name", dest_id[:8])
-            limit     = max_posts_for_dest(dest)
+            limit = max_posts_for_dest(dest)
 
             # Chỉ lấy top-N bài chưa dedup cho trang đích này
             dest_posts = new_posts[:limit]
-            slots      = build_slots_for_dest(dest, len(dest_posts))
+            slots = build_slots_for_dest(dest, len(dest_posts))
             scheduled_ok = 0
 
             logger.info(
@@ -137,29 +140,49 @@ def run():
 
             for idx, (post, page) in enumerate(dest_posts):
                 fb_post_id = post["fb_post_id"]
-                slot       = slots[idx]
+                slot = slots[idx]
 
                 try:
                     poster = FacebookPoster(
-                        page_id      = dest["fb_page_id"],
-                        access_token = dest["fb_access_token"],
+                        page_id=dest["fb_page_id"],
+                        access_token=dest["fb_access_token"],
                     )
                     poster.post(
-                        content      = post.get("content") or "",
-                        image_urls   = post.get("image_urls") or [],
-                        video_url    = post.get("video_url"),
-                        reel_url     = post.get("reel_url"),
-                        scheduled_at = slot,
+                        content=post.get("content") or "",
+                        image_urls=post.get("image_urls") or [],
+                        video_url=post.get("video_url"),
+                        reel_url=post.get("reel_url"),
+                        scheduled_at=slot,
                     )
+
+                    if DB_BACKEND == "supabase":
+                        db_post_id = save_post(
+                            fb_post_id=fb_post_id,
+                            source_page_id=page["id"],
+                            content=post.get("content") or "",
+                            image_urls=post.get("image_urls") or [],
+                            video_url=post.get("video_url"),
+                            original_post_time=post.get("time"),
+                        )
+                        if db_post_id:
+                            sched_id = create_scheduled_post(
+                                post_id=db_post_id,
+                                destination_page_id=dest_id,
+                                scheduled_at=slot.isoformat(),
+                            )
+                        else:
+                            sched_id = None
+                    else:
+                        sched_id = None
 
                     save_dedup(fb_post_id, page["id"], dest_id)
                     save_log(
-                        scheduled_post_id   = None,
-                        fb_post_id          = fb_post_id,
-                        destination_page_id = dest_id,
-                        result              = "scheduled",
-                        source_page_url     = page.get("fb_page_url", ""),
-                        post_url            = post.get("post_url", ""),
+                        scheduled_post_id=sched_id,
+                        fb_post_id=fb_post_id,
+                        destination_page_id=dest_id,
+                        result="scheduled",
+                        source_page_url=page.get("fb_page_url", ""),
+                        post_url=post.get("post_url", ""),
                     )
                     scheduled_ok += 1
 
@@ -168,17 +191,19 @@ def run():
                         f"  Lỗi hẹn giờ bài {fb_post_id[:20]}... → {dest_name}: {e}"
                     )
                     save_log(
-                        scheduled_post_id   = None,
-                        fb_post_id          = fb_post_id,
-                        destination_page_id = dest_id,
-                        result              = "failed",
-                        error_message       = str(e),
-                        source_page_url     = page.get("fb_page_url", ""),
+                        scheduled_post_id=None,
+                        fb_post_id=fb_post_id,
+                        destination_page_id=dest_id,
+                        result="failed",
+                        error_message=str(e),
+                        source_page_url=page.get("fb_page_url", ""),
                     )
                     total_errors += 1
 
             commit_schedule(dest_id, slots[:scheduled_ok])
-            logger.info(f"  {dest_name}: đã hẹn giờ {scheduled_ok}/{len(dest_posts)} bài")
+            logger.info(
+                f"  {dest_name}: đã hẹn giờ {scheduled_ok}/{len(dest_posts)} bài"
+            )
 
         total_new += len(new_posts)
 

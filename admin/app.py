@@ -566,7 +566,7 @@ elif page == "🗓️ Lịch đăng":
     with col2:
         limit = st.selectbox("Hiển thị", [20, 50, 100], index=0)
         status_filter = st.selectbox(
-            "Trạng thái", ["pending", "posted", "failed", "Tất cả"]
+            "Trạng thái", ["pending", "scheduled", "posted", "failed", "Tất cả"]
         )
 
     query = db.table("scheduled_posts").select(
@@ -577,7 +577,7 @@ elif page == "🗓️ Lịch đăng":
         query = query.eq("status", status_filter)
 
     items = (
-        query.order("scheduled_at", desc=(status_filter == "posted"))
+        query.order("scheduled_at", desc=(status_filter in ("posted", "failed")))
         .limit(limit)
         .execute()
         .data
@@ -590,6 +590,12 @@ elif page == "🗓️ Lịch đăng":
             content = (post.get("content") or "")[:80]
             has_img = "🖼️" if post.get("image_urls") else ""
             has_vid = "🎬" if post.get("video_url") else ""
+            status_emoji = {
+                "pending": "⏳ Chờ",
+                "scheduled": "📅 Đã hẹn",
+                "posted": "✅ Đã đăng",
+                "failed": "❌ Lỗi",
+            }.get(item["status"], item["status"])
             rows.append(
                 {
                     "Giờ đăng": item["scheduled_at"][:16].replace("T", " "),
@@ -598,7 +604,7 @@ elif page == "🗓️ Lịch đăng":
                     ),
                     "Media": f"{has_img}{has_vid}",
                     "Nội dung": content,
-                    "Trạng thái": item["status"],
+                    "Trạng thái": status_emoji,
                     "Retry": item.get("retry_count", 0),
                 }
             )
@@ -665,7 +671,24 @@ elif page == "🚀 Chạy Scrape":
     - Hẹn giờ đăng lên trang đích
     """)
 
+    clear_dedup = st.selectbox(
+        "Xóa dedup trước khi chạy (để đăng lại bài cũ)?",
+        ["false", "true"],
+        index=0,
+    )
+
     if st.button("▶️ Chạy ngay", type="primary", use_container_width=True):
+        db = get_db()
+
+        if clear_dedup == "true":
+            with st.spinner("⏳ Đang xóa dedup..."):
+                try:
+                    db.table("posted_dedup").delete().neq("fb_post_id", "").execute()
+                    db.table("posts").delete().neq("id", "").execute()
+                    st.success("✅ Đã xóa dedup và lịch cũ")
+                except Exception as e:
+                    st.warning(f"Không thể xóa dedup: {e}")
+
         env = os.environ.copy()
         env["DB_BACKEND"] = "supabase"
         env["SUPABASE_URL"] = st.secrets.get("SUPABASE_URL") or os.environ.get(
