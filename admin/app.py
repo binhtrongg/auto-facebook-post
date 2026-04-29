@@ -684,7 +684,9 @@ elif page == "🚀 Chạy Scrape":
             with st.spinner("⏳ Đang xóa dedup..."):
                 try:
                     db.table("posted_dedup").delete().neq("fb_post_id", "").execute()
-                    db.table("posts").delete().neq("id", "").execute()
+                    db.table("posts").delete().in_(
+                        "status", ["pending", "scheduled", "posted", "failed"]
+                    ).execute()
                     st.success("✅ Đã xóa dedup và lịch cũ")
                 except Exception as e:
                     st.warning(f"Không thể xóa dedup: {e}")
