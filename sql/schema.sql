@@ -116,6 +116,8 @@ CREATE TABLE post_logs (
     destination_page_id  UUID,
     result               TEXT,                     -- 'scheduled' | 'success' | 'failed'
     error_message        TEXT,
+    source_page_url      TEXT,
+    post_url             TEXT,
     created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
