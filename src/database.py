@@ -256,6 +256,24 @@ def save_dedup(fb_post_id: str, source_page_id: str, destination_page_id: str):
     ).execute()
 
 
+# ── App Settings (auto-run config) ─────────────────────────
+
+
+def get_app_settings() -> dict | None:
+    """Đọc row cấu hình auto-run (chỉ có 1 row)."""
+    db = get_db()
+    res = db.table("app_settings").select("*").limit(1).execute()
+    return res.data[0] if res.data else None
+
+
+def update_app_settings_last_run(settings_id: str, last_run_iso: str):
+    """Update last_run_at cho row settings."""
+    db = get_db()
+    db.table("app_settings").update({"last_run_at": last_run_iso}).eq(
+        "id", settings_id
+    ).execute()
+
+
 # ── Logs ───────────────────────────────────────────────────
 
 

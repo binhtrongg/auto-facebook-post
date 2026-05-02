@@ -11,6 +11,7 @@ from supabase import create_client
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone, timedelta
 
 # ── Page config ────────────────────────────────────────────
 st.set_page_config(
@@ -49,6 +50,7 @@ with st.sidebar:
             "🗓️ Lịch đăng",
             "📋 Logs",
             "🚀 Chạy Scrape",
+            "⚙️ Cài đặt",
         ],
         label_visibility="collapsed",
     )
@@ -700,6 +702,7 @@ elif page == "🚀 Chạy Scrape":
             "SUPABASE_KEY", ""
         )
         env["LOG_LEVEL"] = "INFO"
+        env["FORCE_RUN"] = "1"
 
         status = st.status("⏳ Đang chạy scrape...", expanded=True)
         log_container = st.empty()
@@ -733,3 +736,120 @@ elif page == "🚀 Chạy Scrape":
             st.error(f"Lỗi: {e}")
 
         st.button("🔄 Chạy lại", use_container_width=True)
+
+
+# ══════════════════════════════════════════════════════════
+# PAGE: CÀI ĐẶT (auto-run config)
+# ══════════════════════════════════════════════════════════
+elif page == "⚙️ Cài đặt":
+    st.title("⚙️ Cài đặt auto-run")
+    db = get_db()
+
+    res = db.table("app_settings").select("*").limit(1).execute().data
+    if not res:
+        db.table("app_settings").insert(
+            {"enabled": False, "interval_minutes": 480}
+        ).execute()
+        res = db.table("app_settings").select("*").limit(1).execute().data
+    s = res[0]
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Trạng thái", "🟢 Bật" if s["enabled"] else "🔴 Tắt")
+    col2.metric("Mỗi", f"{s['interval_minutes']} phút")
+    last_run = s.get("last_run_at")
+    if last_run:
+        col3.metric("Lần chạy cuối", last_run[:16].replace("T", " "))
+        last_dt = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
+        next_dt = last_dt + timedelta(minutes=s["interval_minutes"])
+        st.info(
+            f"⏭️ Lần chạy tiếp theo (sớm nhất): "
+            f"{next_dt.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        )
+    else:
+        col3.metric("Lần chạy cuối", "Chưa chạy")
+
+    st.markdown("---")
+
+    intervals = [60, 120, 240, 360, 480, 720, 1440]
+    interval_labels = {
+        60: "1 giờ",
+        120: "2 giờ",
+        240: "4 giờ",
+        360: "6 giờ",
+        480: "8 giờ",
+        720: "12 giờ",
+        1440: "24 giờ",
+    }
+    cur_interval = s["interval_minutes"]
+    if cur_interval not in intervals:
+        intervals.append(cur_interval)
+        interval_labels[cur_interval] = f"{cur_interval} phút"
+        intervals.sort()
+
+    with st.form("settings_form"):
+        enabled = st.checkbox("Bật auto-run", value=s["enabled"])
+        interval = st.selectbox(
+            "Chạy mỗi",
+            intervals,
+            index=intervals.index(cur_interval),
+            format_func=lambda x: interval_labels.get(x, f"{x} phút"),
+        )
+        c1, c2 = st.columns(2)
+        if c1.form_submit_button("💾 Lưu", use_container_width=True):
+            db.table("app_settings").update(
+                {
+                    "enabled": enabled,
+                    "interval_minutes": interval,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).eq("id", s["id"]).execute()
+            st.success("✅ Đã lưu")
+            st.rerun()
+        if c2.form_submit_button(
+            "🔄 Reset 'Lần chạy cuối'", use_container_width=True
+        ):
+            db.table("app_settings").update({"last_run_at": None}).eq(
+                "id", s["id"]
+            ).execute()
+            st.success("✅ Đã reset, lần ping kế tiếp sẽ chạy ngay")
+            st.rerun()
+
+    st.markdown("---")
+    st.subheader("🚂 Hướng dẫn deploy Railway")
+
+    st.markdown(
+        """
+    Project đã sẵn sàng cho Railway. Setup 1 lần như sau:
+
+    **1. Tạo project trên [railway.app](https://railway.app)**
+    - Login → **New Project** → **Deploy from GitHub repo**
+    - Chọn repo `auto-facebook-post` → Railway auto-build từ `Dockerfile`
+
+    **2. Set Variables (Settings → Variables) cho service `web`:**
+    ```
+    SUPABASE_URL=https://xxx.supabase.co
+    SUPABASE_KEY=eyJhbGc...
+    DB_BACKEND=supabase
+    PORT=8501
+    ```
+
+    **3. Tạo cron service (đăng định kỳ):**
+    - Trong cùng project → **+ Create** → **GitHub Repo** → chọn lại repo
+    - Settings → **Start Command**: `python -m src.main_scrape`
+    - Settings → **Cron Schedule**: `*/15 * * * *` (chạy mỗi 15 phút)
+    - Settings → **Variables**: copy 3 var trên (hoặc dùng "Reference Variable")
+    - **Networking**: tắt public domain (cron không cần expose)
+
+    **4. Cấu hình lịch ngay tại đây ↑**
+    - Bật **Auto-run**
+    - Chọn interval (vd 8 giờ)
+    - Cron service ping mỗi 15 phút, đọc bảng này. Đến giờ thì chạy thật,
+      chưa đến thì skip ngay (tốn ~3s mỗi lần check).
+
+    **Lưu ý:**
+    - Nút **🚀 Chạy ngay** ở page "Chạy Scrape" set `FORCE_RUN=1` → bypass
+      check settings, chạy luôn (dùng để test).
+    - `FORCE_RUN=1` còn dùng được khi gọi `python -m src.main_scrape` từ CLI
+      hoặc GH Actions workflow_dispatch.
+    """
+    )

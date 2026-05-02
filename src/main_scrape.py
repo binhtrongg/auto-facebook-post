@@ -13,6 +13,7 @@ Flow mới (schedule trực tiếp lên Facebook):
 """
 
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -37,6 +38,8 @@ else:
         save_post,
         create_scheduled_post,
         update_source_page_scraped_at,
+        get_app_settings,
+        update_app_settings_last_run,
     )
 from src.apify_scraper import scrape_pages
 from src.fb_poster import FacebookPoster
@@ -50,7 +53,49 @@ logging.basicConfig(
 logger = logging.getLogger("main_scrape")
 
 
+def _should_run_per_settings() -> bool:
+    """
+    Check bảng app_settings để quyết định có chạy hay không.
+    - FORCE_RUN=1 → bypass, chạy luôn (manual trigger)
+    - DB_BACKEND != supabase → bypass (không có bảng settings)
+    - settings.enabled = false → skip
+    - now - last_run_at < interval_minutes → skip (chưa đến giờ)
+    """
+    if os.environ.get("FORCE_RUN") == "1":
+        logger.info("FORCE_RUN=1 → bỏ qua check settings, chạy ngay")
+        return True
+    if DB_BACKEND != "supabase":
+        return True
+    try:
+        s = get_app_settings()
+    except Exception as e:
+        logger.warning(f"Không đọc được app_settings: {e} → chạy mặc định")
+        return True
+    if not s:
+        logger.info("Chưa có row app_settings → chạy mặc định")
+        return True
+    if not s.get("enabled"):
+        logger.info("app_settings.enabled = false → skip")
+        return False
+    interval_min = int(s.get("interval_minutes") or 480)
+    last_run = s.get("last_run_at")
+    now = datetime.now(timezone.utc)
+    if last_run:
+        last_dt = datetime.fromisoformat(str(last_run).replace("Z", "+00:00"))
+        elapsed_min = (now - last_dt).total_seconds() / 60
+        if elapsed_min < interval_min:
+            logger.info(
+                f"Chưa đến giờ: {elapsed_min:.1f}/{interval_min} phút trôi qua → skip"
+            )
+            return False
+    update_app_settings_last_run(s["id"], now.isoformat())
+    return True
+
+
 def run():
+    if not _should_run_per_settings():
+        return
+
     logger.info("=" * 60)
     logger.info("BẮT ĐẦU JOB SCRAPE + SCHEDULE")
     logger.info("=" * 60)

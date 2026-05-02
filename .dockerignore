@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.local
+.streamlit/secrets.toml
+*.md
+docker-compose.yml
+nginx
+google_apps_script
+run_local.sh

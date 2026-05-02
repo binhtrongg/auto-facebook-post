@@ -139,3 +139,19 @@ CREATE INDEX idx_logs_created_at      ON post_logs(created_at);
 -- SELECT cron.schedule('cleanup-logs', '0 2 * * *',
 --   $$DELETE FROM post_logs WHERE created_at < NOW() - INTERVAL '30 days'$$
 -- );
+
+-- ============================================================
+-- APP SETTINGS (cấu hình auto-run scrape từ admin UI)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS app_settings (
+    id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    enabled           BOOLEAN DEFAULT false,
+    interval_minutes  INTEGER DEFAULT 480,
+    last_run_at       TIMESTAMP WITH TIME ZONE,
+    updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert một row mặc định nếu chưa có
+INSERT INTO app_settings (enabled, interval_minutes)
+SELECT false, 480
+WHERE NOT EXISTS (SELECT 1 FROM app_settings);
