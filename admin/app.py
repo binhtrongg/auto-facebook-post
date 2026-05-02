@@ -823,41 +823,74 @@ elif page == "⚙️ Cài đặt":
             st.rerun()
 
     st.markdown("---")
-    st.subheader("🚂 Hướng dẫn deploy Railway")
+    st.subheader("📖 Hướng dẫn sử dụng")
 
     st.markdown(
         """
-    Project đã sẵn sàng cho Railway. Setup 1 lần như sau:
+        ### 🎯 Auto-run hoạt động thế nào?
 
-    **1. Tạo project trên [railway.app](https://railway.app)**
-    - Login → **New Project** → **Deploy from GitHub repo**
-    - Chọn repo `auto-facebook-post` → Railway auto-build từ `Dockerfile`
+        Hệ thống có **1 con cron chạy ngầm 24/7** (mỗi 15 phút "thức dậy"
+        một lần). Mỗi lần thức, nó vào đây đọc 2 thông tin:
 
-    **2. Set Variables (Settings → Variables) cho service `web`:**
-    ```
-    SUPABASE_URL=https://xxx.supabase.co
-    SUPABASE_KEY=eyJhbGc...
-    DB_BACKEND=supabase
-    PORT=8501
-    ```
+        - **Bật auto-run** = bạn có muốn chạy không?
+        - **Chạy mỗi** = bao lâu thì chạy 1 lần?
 
-    **3. Tạo cron service (đăng định kỳ):**
-    - Trong cùng project → **+ Create** → **GitHub Repo** → chọn lại repo
-    - Settings → **Start Command**: `python -m src.main_scrape`
-    - Settings → **Cron Schedule**: `*/15 * * * *` (chạy mỗi 15 phút)
-    - Settings → **Variables**: copy 3 var trên (hoặc dùng "Reference Variable")
-    - **Networking**: tắt public domain (cron không cần expose)
+        Nếu bạn **tắt** auto-run → cron skip ngay, không làm gì.
+        Nếu **bật** + chưa đủ giờ (vd mới chạy 30 phút trước, interval 4h)
+        → cũng skip. Chỉ khi đủ giờ mới scrape thật.
 
-    **4. Cấu hình lịch ngay tại đây ↑**
-    - Bật **Auto-run**
-    - Chọn interval (vd 8 giờ)
-    - Cron service ping mỗi 15 phút, đọc bảng này. Đến giờ thì chạy thật,
-      chưa đến thì skip ngay (tốn ~3s mỗi lần check).
+        → Bật xong **không cần làm gì nữa**, hệ thống tự chạy.
 
-    **Lưu ý:**
-    - Nút **🚀 Chạy ngay** ở page "Chạy Scrape" set `FORCE_RUN=1` → bypass
-      check settings, chạy luôn (dùng để test).
-    - `FORCE_RUN=1` còn dùng được khi gọi `python -m src.main_scrape` từ CLI
-      hoặc GH Actions workflow_dispatch.
-    """
+        ---
+
+        ### ⚙️ Các thao tác
+
+        **1. Bật/Tắt auto-run**
+        - Tick checkbox → bấm **💾 Lưu**
+        - Tắt khi đi du lịch / không muốn đăng tạm thời
+        - Bật lại bất cứ lúc nào, không mất data
+
+        **2. Đổi tần suất ("Chạy mỗi")**
+        - Tối thiểu khuyến nghị: **1 giờ**
+        - Mặc định: **8 giờ** (đủ cho 95% trường hợp)
+        - Đổi xong bấm **💾 Lưu**
+
+        **3. Reset 'Lần chạy cuối'**
+        - Bấm khi muốn **chạy lại ngay lập tức** (không đợi đủ interval)
+        - Ví dụ: bạn vừa thêm trang nguồn mới và muốn scrape liền
+        - Bấm xong, trong vòng 15 phút tiếp theo cron sẽ chạy
+
+        **4. Chạy thủ công ngay (không qua cron)**
+        - Vào tab **🚀 Chạy Scrape** → bấm **▶️ Chạy ngay**
+        - Bypass mọi check, chạy luôn + xem log realtime
+        - Dùng để test sau khi thay đổi cấu hình
+
+        ---
+
+        ### ✅ Kiểm tra cron có chạy không
+
+        Sau khi bật auto-run, đợi đủ interval rồi check:
+
+        - **Page này**: field "Lần chạy cuối" phải cập nhật theo thời gian
+          gần nhất
+        - **Tab 📋 Logs**: phải có log mới với "Kết quả: ✓ OK"
+        - **Tab 🗓️ Lịch đăng**: phải có bài mới với status "📅 Đã hẹn"
+
+        Nếu sau 1-2 chu kỳ vẫn không thấy gì:
+        1. Kiểm tra trang nguồn còn hoạt động (tab 🔍 Trang nguồn)
+        2. Kiểm tra Apify keys còn quota (tab 🔑 Apify Keys)
+        3. Kiểm tra trang đích còn hợp lệ + token chưa hết hạn (tab 📤 Trang đích)
+        4. Bấm **🚀 Chạy Scrape → ▶️ Chạy ngay** xem log lỗi
+
+        ---
+
+        ### ⚠️ Lưu ý
+
+        - **Đừng set interval quá ngắn** (< 1h). Apify free tier có giới hạn
+          credit, scrape liên tục sẽ hết quota nhanh.
+        - **Bài đã đăng KHÔNG bị đăng lại**. Hệ thống tự dedup. Muốn đăng
+          lại bài cũ, vào **🚀 Chạy Scrape**, chọn `clear_dedup = true`.
+        - **Mỗi trang đích có giới hạn riêng** về số bài/lần và khoảng cách
+          giữa các bài (cấu hình ở DB). Cron tôn trọng giới hạn này.
+        """
     )
