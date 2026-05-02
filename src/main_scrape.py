@@ -155,6 +155,8 @@ def run():
                         scheduled_at=slot,
                     )
 
+                    save_dedup(fb_post_id, page["id"], dest_id)
+
                     if DB_BACKEND == "supabase":
                         db_post_id = save_post(
                             fb_post_id=fb_post_id,
@@ -175,7 +177,6 @@ def run():
                     else:
                         sched_id = None
 
-                    save_dedup(fb_post_id, page["id"], dest_id)
                     save_log(
                         scheduled_post_id=sched_id,
                         fb_post_id=fb_post_id,
