@@ -23,12 +23,24 @@ st.set_page_config(
 
 
 # ── Supabase client ────────────────────────────────────────
+def _get_secret(name: str) -> str | None:
+    """Đọc secret từ st.secrets (nếu có file) hoặc env var. An toàn khi
+    secrets.toml không tồn tại (vd trên Railway dùng env vars)."""
+    try:
+        val = st.secrets.get(name)
+        if val:
+            return val
+    except Exception:
+        pass
+    return os.environ.get(name)
+
+
 @st.cache_resource
 def get_db():
-    url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    url = _get_secret("SUPABASE_URL")
+    key = _get_secret("SUPABASE_KEY")
     if not url or not key:
-        st.error("Thiếu SUPABASE_URL hoặc SUPABASE_KEY trong Secrets!")
+        st.error("Thiếu SUPABASE_URL hoặc SUPABASE_KEY trong Secrets/Env!")
         st.stop()
     return create_client(url, key)
 
@@ -695,12 +707,8 @@ elif page == "🚀 Chạy Scrape":
 
         env = os.environ.copy()
         env["DB_BACKEND"] = "supabase"
-        env["SUPABASE_URL"] = st.secrets.get("SUPABASE_URL") or os.environ.get(
-            "SUPABASE_URL", ""
-        )
-        env["SUPABASE_KEY"] = st.secrets.get("SUPABASE_KEY") or os.environ.get(
-            "SUPABASE_KEY", ""
-        )
+        env["SUPABASE_URL"] = _get_secret("SUPABASE_URL") or ""
+        env["SUPABASE_KEY"] = _get_secret("SUPABASE_KEY") or ""
         env["LOG_LEVEL"] = "INFO"
         env["FORCE_RUN"] = "1"
 
